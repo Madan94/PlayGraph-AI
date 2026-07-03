@@ -1,4 +1,6 @@
-# NextPlayAI
+# PlayGraph-AI (NextPlayAI)
+
+Empowering India's Young Athletes Through Technology and Opportunity.
 
 Memory-first AI platform for elite athlete intelligence. **Cognee is the brain** — remove it, lose all intelligence.
 
@@ -110,5 +112,6 @@ All intelligence flows through `memory/cognee_client.py`:
 ## Docs
 
 - [Implementation Plan](docs/implementation-plan.md)
+- [Project Status](docs/project-status.md)
 - [Kafka Topics](docs/kafka-topics.md)
 - [Architecture](docs/architecture.md)
