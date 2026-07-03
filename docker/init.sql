@@ -1,0 +1,99 @@
+-- NextPlayAI operational schema (intelligence lives in Cognee)
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TYPE user_role AS ENUM ('athlete', 'coach', 'scout', 'admin');
+CREATE TYPE session_status AS ENUM ('pending', 'processing', 'completed', 'failed');
+CREATE TYPE asset_type AS ENUM ('video', 'audio', 'image', 'json', 'note');
+CREATE TYPE memory_operation AS ENUM ('remember', 'recall', 'improve', 'forget');
+
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role user_role NOT NULL DEFAULT 'athlete',
+    full_name VARCHAR(255),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE athletes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL,
+    sport VARCHAR(64) NOT NULL DEFAULT 'cricket',
+    dob DATE,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE coach_athlete (
+    coach_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    athlete_id UUID NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+    PRIMARY KEY (coach_id, athlete_id)
+);
+
+CREATE TABLE sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    athlete_id UUID NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+    type VARCHAR(64) NOT NULL DEFAULT 'training',
+    sport VARCHAR(64) NOT NULL DEFAULT 'cricket',
+    title VARCHAR(255) NOT NULL,
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status session_status NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE session_assets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    asset_type asset_type NOT NULL,
+    minio_key VARCHAR(512) NOT NULL,
+    mime_type VARCHAR(128),
+    size_bytes BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ingestion_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    asset_id UUID REFERENCES session_assets(id) ON DELETE SET NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'queued',
+    kafka_topic VARCHAR(128),
+    error TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE memory_operations_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+    athlete_id UUID REFERENCES athletes(id) ON DELETE SET NULL,
+    operation memory_operation NOT NULL,
+    cognee_ref VARCHAR(255),
+    payload_hash VARCHAR(64),
+    latency_ms INTEGER,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    pdf_minio_key VARCHAR(512),
+    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Demo seed data
+INSERT INTO users (id, email, password_hash, role, full_name) VALUES
+    ('11111111-1111-1111-1111-111111111111', 'coach@nextplay.ai', '$2b$12$demo_hash_placeholder', 'coach', 'Marcus Chen'),
+    ('22222222-2222-2222-2222-222222222222', 'rahul@nextplay.ai', '$2b$12$demo_hash_placeholder', 'athlete', 'Rahul Sharma');
+
+INSERT INTO athletes (id, user_id, name, sport, metadata) VALUES
+    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'Rahul Sharma', 'cricket', '{"position": "batsman", "team": "Apex United"}');
+
+INSERT INTO coach_athlete (coach_id, athlete_id) VALUES
+    ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+
+CREATE INDEX idx_sessions_athlete ON sessions(athlete_id);
+CREATE INDEX idx_memory_ops_athlete ON memory_operations_log(athlete_id);
+CREATE INDEX idx_memory_ops_created ON memory_operations_log(created_at DESC);

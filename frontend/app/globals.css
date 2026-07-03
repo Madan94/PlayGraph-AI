@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+.glass {
+  @apply bg-white/[0.05] backdrop-blur-xl border border-white/10;
+}
+
+.gradient-text {
+  @apply bg-gradient-to-r from-purple via-purple-light to-cyan bg-clip-text text-transparent;
+}

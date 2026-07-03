@@ -1,0 +1,130 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nextplay
+      POSTGRES_PASSWORD: nextplay
+      POSTGRES_DB: nextplay
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextplay"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.4
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nextplay:nextplay@postgres:5432/nextplay
+      MINIO_ENDPOINT: minio:9000
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      DATA_ROOT_DIRECTORY: /app/.cognee_data
+      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
+    volumes:
+      - cognee_data:/app/.cognee_data
+      - cognee_system:/app/.cognee_system
+      - ../memory:/app/memory
+      - ../backend:/app/backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  json-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    env_file:
+      - ../.env
+    environment:
+      WORKER_TYPE: json
+      DATABASE_URL: postgresql+asyncpg://nextplay:nextplay@postgres:5432/nextplay
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      DATA_ROOT_DIRECTORY: /app/.cognee_data
+      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
+    volumes:
+      - cognee_data:/app/.cognee_data
+      - cognee_system:/app/.cognee_system
+    depends_on:
+      - backend
+      - redpanda
+
+  video-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    env_file:
+      - ../.env
+    environment:
+      WORKER_TYPE: video
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: nextplay-assets
+      DATA_ROOT_DIRECTORY: /app/.cognee_data
+      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
+    volumes:
+      - cognee_data:/app/.cognee_data
+      - cognee_system:/app/.cognee_system
+    depends_on:
+      - backend
+      - redpanda
+      - minio
+
+volumes:
+  postgres_data:
+  minio_data:
+  cognee_data:
+  cognee_system:
