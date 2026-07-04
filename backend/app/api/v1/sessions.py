@@ -29,7 +29,7 @@ async def create_session(body: CreateSessionRequest, db: AsyncSession = Depends(
     await db.execute(
         text("""
             INSERT INTO sessions (id, athlete_id, type, sport, title, status)
-            VALUES (:id::uuid, :athlete_id::uuid, :type, :sport, :title, 'pending')
+            VALUES (CAST(:id AS uuid), CAST(:athlete_id AS uuid), :type, :sport, :title, 'pending')
         """),
         {
             "id": session_id,
@@ -58,7 +58,7 @@ async def upload_asset(
     await db.execute(
         text("""
             INSERT INTO session_assets (id, session_id, asset_type, minio_key, mime_type, size_bytes)
-            VALUES (:id::uuid, :session_id::uuid, :asset_type::asset_type, :key, :mime, :size)
+            VALUES (CAST(:id AS uuid), CAST(:session_id AS uuid), CAST(:asset_type AS asset_type), :key, :mime, :size)
         """),
         {
             "id": asset_id,
@@ -74,12 +74,12 @@ async def upload_asset(
     await db.execute(
         text("""
             INSERT INTO ingestion_jobs (id, session_id, asset_id, status, kafka_topic)
-            VALUES (:id::uuid, :session_id::uuid, :asset_id::uuid, 'queued', :topic)
+            VALUES (CAST(:id AS uuid), CAST(:session_id AS uuid), CAST(:asset_id AS uuid), 'queued', :topic)
         """),
         {"id": job_id, "session_id": session_id, "asset_id": asset_id, "topic": topic},
     )
     await db.execute(
-        text("UPDATE sessions SET status = 'processing' WHERE id = :id::uuid"),
+        text("UPDATE sessions SET status = 'processing' WHERE id = CAST(:id AS uuid)"),
         {"id": session_id},
     )
     await db.commit()
@@ -103,7 +103,7 @@ async def upload_asset(
 @router.get("/{session_id}")
 async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        text("SELECT id, athlete_id, title, type, sport, status, started_at FROM sessions WHERE id = :id::uuid"),
+        text("SELECT id, athlete_id, title, type, sport, status, started_at FROM sessions WHERE id = CAST(:id AS uuid)"),
         {"id": session_id},
     )
     row = result.first()

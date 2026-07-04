@@ -83,7 +83,7 @@ class CogneeMemoryClient:
         if query.athlete_id:
             search_text = f"Athlete {query.athlete_id}: {query.text}"
 
-        raw = await cognee.recall(search_text, top_k=query.limit)
+        raw = await cognee.recall(search_text, top_k=query.limit, datasets=[self.dataset])
 
         sources: list[RecallSource] = []
         if isinstance(raw, list):
@@ -115,7 +115,7 @@ class CogneeMemoryClient:
 
     async def improve(self, athlete_id: str | None = None) -> None:
         start = time.perf_counter()
-        await cognee.improve(dataset_name=self.dataset)
+        await cognee.improve(dataset=self.dataset)
         latency_ms = int((time.perf_counter() - start) * 1000)
         logger.info("improve() completed (%dms)", latency_ms)
 
@@ -139,7 +139,7 @@ class CogneeMemoryClient:
             logger.info("forget() scoped archive for athlete=%s session=%s",
                         policy.athlete_id, policy.session_id)
         else:
-            await cognee.forget(dataset_name=self.dataset)
+            await cognee.forget(dataset=self.dataset)
 
         latency_ms = int((time.perf_counter() - start) * 1000)
         logger.info("forget() completed (%dms)", latency_ms)

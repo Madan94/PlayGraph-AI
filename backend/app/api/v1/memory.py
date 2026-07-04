@@ -55,7 +55,7 @@ async def remember_memory(
     await db.execute(
         text("""
             INSERT INTO memory_operations_log (session_id, athlete_id, operation, cognee_ref, metadata)
-            VALUES (:session_id::uuid, :athlete_id::uuid, 'remember', :ref, :meta::jsonb)
+            VALUES (CAST(:session_id AS uuid), CAST(:athlete_id AS uuid), 'remember', :ref, CAST(:meta AS jsonb))
         """),
         {
             "session_id": body.session_id,
@@ -79,7 +79,7 @@ async def recall_memory(
     await db.execute(
         text("""
             INSERT INTO memory_operations_log (athlete_id, operation, metadata)
-            VALUES (:athlete_id::uuid, 'recall', :meta::jsonb)
+            VALUES (CAST(:athlete_id AS uuid), 'recall', CAST(:meta AS jsonb))
         """),
         {
             "athlete_id": body.athlete_id,

@@ -87,14 +87,14 @@ async def generate_report(
         await db.execute(
             text("""
                 INSERT INTO reports (session_id, pdf_minio_key)
-                VALUES (:session_id::uuid, :key)
+                VALUES (CAST(:session_id AS uuid), :key)
             """),
             {"session_id": session_id, "key": key},
         )
     await db.execute(
         text("""
             INSERT INTO memory_operations_log (athlete_id, operation, metadata)
-            VALUES (:athlete_id::uuid, 'recall', :meta::jsonb)
+            VALUES (CAST(:athlete_id AS uuid), 'recall', CAST(:meta AS jsonb))
         """),
         {
             "athlete_id": body.athlete_id,

@@ -33,7 +33,7 @@ async def coach_chat(
     await db.execute(
         text("""
             INSERT INTO memory_operations_log (athlete_id, operation, metadata)
-            VALUES (:athlete_id::uuid, 'recall', :meta::jsonb)
+            VALUES (CAST(:athlete_id AS uuid), 'recall', CAST(:meta AS jsonb))
         """),
         {
             "athlete_id": body.athlete_id,
