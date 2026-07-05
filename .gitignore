@@ -4,6 +4,8 @@ node_modules/
 __pycache__/
 *.pyc
 .env
+.env.local
+frontend/.env.local
 .cognee_data/
 .cognee_system/
 dist/

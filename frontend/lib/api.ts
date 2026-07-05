@@ -15,7 +15,12 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
-export const DEMO_ATHLETE_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+export interface Athlete {
+  id: string;
+  name: string;
+  sport: string;
+  metadata: Record<string, unknown>;
+}
 
 export interface ChatResponse {
   answer: string;
@@ -26,14 +31,33 @@ export interface ChatResponse {
   };
 }
 
+export interface CreateAthleteInput {
+  name: string;
+  sport?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export const athletesApi = {
+  list: () => api<{ athletes: Athlete[] }>("/api/v1/athletes"),
+  get: (id: string) => api<Athlete>(`/api/v1/athletes/${id}`),
+  create: (body: CreateAthleteInput) =>
+    api<Athlete>("/api/v1/athletes", {
+      method: "POST",
+      body: JSON.stringify({
+        name: body.name,
+        sport: body.sport ?? "athletics",
+        metadata: body.metadata ?? {},
+      }),
+    }),
+};
+
 export const memoryApi = {
-  seedDemo: () => api<{ memories_seeded: number }>("/api/v1/memory/seed-demo", { method: "POST", body: "{}" }),
   recall: (athlete_id: string, query: string) =>
     api("/api/v1/memory/recall", {
       method: "POST",
       body: JSON.stringify({ athlete_id, query }),
     }),
-  stats: () => api<{ operations: Record<string, number> }>("/api/v1/memory/stats"),
+  stats: () => api<{ operations: Record<string, number>; cognee_dataset: string }>("/api/v1/memory/stats"),
 };
 
 export const chatApi = {

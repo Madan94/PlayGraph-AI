@@ -1,3 +1,12 @@
+# Workers + infra only (backend runs on host).
+# Shares Cognee data with host via bind mounts — set COGNEE_HOST paths in repo .env or below.
+#
+# Usage:
+#   cd docker
+#   docker compose -f docker-compose.workers.yml up -d --build
+#
+# Ensure host .env has KAFKA_BOOTSTRAP_SERVERS=localhost:9092 for local backend.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -54,33 +63,6 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.backend
-    ports:
-      - "8000:8000"
-    env_file:
-      - ../.env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://nextplay:nextplay@postgres:5432/nextplay
-      MINIO_ENDPOINT: minio:9000
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      DATA_ROOT_DIRECTORY: /app/.cognee_data
-      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
-    volumes:
-      - cognee_data:/app/.cognee_data
-      - cognee_system:/app/.cognee_system
-      - ../memory:/app/memory
-      - ../backend:/app/backend
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      redpanda:
-        condition: service_healthy
-
   json-worker:
     build:
       context: ..
@@ -99,8 +81,8 @@ services:
       SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
       ENABLE_BACKEND_ACCESS_CONTROL: "false"
     volumes:
-      - ../.cognee_data:/app/.cognee_data
-      - ../.cognee_system:/app/.cognee_system
+      - ${COGNEE_DATA_HOST:-../.cognee_data}:/app/.cognee_data
+      - ${COGNEE_SYSTEM_HOST:-../.cognee_system}:/app/.cognee_system
     restart: unless-stopped
     depends_on:
       redpanda:
@@ -126,8 +108,8 @@ services:
       SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
       ENABLE_BACKEND_ACCESS_CONTROL: "false"
     volumes:
-      - ../.cognee_data:/app/.cognee_data
-      - ../.cognee_system:/app/.cognee_system
+      - ${COGNEE_DATA_HOST:-../.cognee_data}:/app/.cognee_data
+      - ${COGNEE_SYSTEM_HOST:-../.cognee_system}:/app/.cognee_system
     restart: unless-stopped
     depends_on:
       redpanda:
@@ -138,5 +120,3 @@ services:
 volumes:
   postgres_data:
   minio_data:
-  cognee_data:
-  cognee_system:

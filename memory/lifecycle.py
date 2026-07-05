@@ -19,9 +19,7 @@ class MemoryLifecycleService:
 
     async def ingest_worker_output(self, payload: MemoryPayload) -> MemoryRef:
         """Called by workers after extracting structured data."""
-        ref = await self.client.remember(payload)
-        await self.client.improve(athlete_id=payload.athlete_id)
-        return ref
+        return await self.client.remember_and_improve(payload)
 
     async def recall_for_coach(self, athlete_id: str, question: str) -> RecallResult:
         return await self.client.recall(RecallQuery(

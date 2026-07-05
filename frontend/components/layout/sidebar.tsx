@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Brain, LayoutDashboard, Upload, MessageSquare, GitBranch, Zap, User } from "lucide-react";
+import { Brain, LayoutDashboard, Upload, MessageSquare, GitBranch, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/athletes/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", label: "Athlete Profile", icon: User },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/upload", label: "Upload", icon: Upload },
   { href: "/chat", label: "Coach Chat", icon: MessageSquare },

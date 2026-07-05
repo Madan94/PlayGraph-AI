@@ -1,2 +1,4 @@
-cognee>=0.3.0
+cognee==1.2.2
+ladybug==0.17.1
+filelock>=3.13.0
 pydantic>=2.0.0

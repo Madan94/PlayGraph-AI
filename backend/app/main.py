@@ -1,12 +1,13 @@
 from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
+from memory.env_loader import load_project_env
 
-from backend.app.api.v1 import auth, chat, health, memory, reports, sessions, stream
+load_project_env()
+
+from backend.app.api.v1 import athletes, auth, chat, health, memory, reports, sessions, stream
 from backend.app.core.config import settings
 from backend.app.infrastructure.kafka import close_producer
 
@@ -33,6 +34,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(athletes.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(memory.router, prefix="/api/v1")
 app.include_router(stream.router, prefix="/api/v1")

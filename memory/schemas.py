@@ -31,7 +31,11 @@ class MemoryEvidence(BaseModel):
 class MemoryPayload(BaseModel):
     athlete_id: str
     session_id: str
-    sport: str = "cricket"
+    sport: str = "unknown"
+    athlete_name: str | None = None
+    session_title: str | None = None
+    description: str | None = None
+    asset_filename: str | None = None
     memory_type: MemoryType
     source_worker: str
     content: MemoryContent
@@ -41,16 +45,30 @@ class MemoryPayload(BaseModel):
     def to_remember_text(self) -> str:
         """Serialize memory for Cognee ingestion with structured context."""
         entities = ", ".join(self.content.entities) if self.content.entities else "none"
-        metrics = ", ".join(f"{k}={v}" for k, v in self.content.metrics.items())
+        display_metrics = {k: v for k, v in self.content.metrics.items() if not k.startswith("_")}
+        metrics = ", ".join(f"{k}={v}" for k, v in display_metrics.items())
+        athlete_line = (
+            f"Athlete: {self.athlete_name} (ID: {self.athlete_id})"
+            if self.athlete_name
+            else f"Athlete ID: {self.athlete_id}"
+        )
+        observations = self.content.metrics.get("_observations")
+        obs_block = ""
+        if isinstance(observations, list) and observations:
+            obs_block = "Observations:\n" + "\n".join(f"- {o}" for o in observations) + "\n"
         return (
             f"[NextPlayAI Memory]\n"
-            f"Athlete ID: {self.athlete_id}\n"
+            f"{athlete_line}\n"
             f"Session ID: {self.session_id}\n"
+            f"Session: {self.session_title or 'untitled'}\n"
             f"Sport: {self.sport}\n"
             f"Type: {self.memory_type.value}\n"
             f"Source: {self.source_worker}\n"
+            f"Asset: {self.asset_filename or 'none'}\n"
+            f"Description: {self.description or 'none'}\n"
             f"Timestamp: {self.timestamp.isoformat()}\n"
             f"Summary: {self.content.summary}\n"
+            f"{obs_block}"
             f"Metrics: {metrics or 'none'}\n"
             f"Entities: {entities}"
         )

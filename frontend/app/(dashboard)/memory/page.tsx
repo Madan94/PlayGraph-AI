@@ -8,7 +8,7 @@ export default function MemoryPage() {
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-3xl font-bold mb-1">Memory</h1>
-        <p className="text-foreground/50">Cognee lifecycle — the hackathon demo centerpiece</p>
+        <p className="text-foreground/50">Cognee lifecycle — upload sessions to see live events</p>
       </div>
       <MemoryTimeline />
       <div className="h-[600px]">

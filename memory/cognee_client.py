@@ -8,6 +8,7 @@ from typing import Callable, Awaitable
 
 import cognee
 
+from memory.cognee_session import cognee_exclusive
 from memory.schemas import (
     ForgetPolicy,
     LifecycleEvent,
@@ -22,6 +23,40 @@ from memory.schemas import (
 logger = logging.getLogger(__name__)
 
 LifecycleCallback = Callable[[LifecycleEvent], Awaitable[None]]
+
+
+def _recall_item_to_text(item: object) -> str:
+    """Extract human-readable text from Cognee 1.x recall result items."""
+    if item is None:
+        return ""
+
+    text = getattr(item, "text", None)
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+
+    content = getattr(item, "content", None)
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+
+    question = getattr(item, "question", None)
+    answer = getattr(item, "answer", None)
+    if isinstance(question, str) and isinstance(answer, str):
+        return f"Q: {question}\nA: {answer}".strip()
+
+    if isinstance(item, dict):
+        for key in ("text", "content", "answer", "summary"):
+            val = item.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+
+    if hasattr(item, "model_dump"):
+        data = item.model_dump()
+        for key in ("text", "content", "answer", "summary"):
+            val = data.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+
+    return str(item).strip()
 
 
 class CogneeMemoryClient:
@@ -39,6 +74,14 @@ class CogneeMemoryClient:
         self._on_lifecycle = on_lifecycle
         self._memory_count = 0
 
+    def athlete_dataset(self, athlete_id: str) -> str:
+        return f"{self.dataset}_{athlete_id}"
+
+    def _resolve_dataset(self, athlete_id: str | None) -> str:
+        if athlete_id:
+            return self.athlete_dataset(athlete_id)
+        return self.dataset
+
     async def _emit(self, event: LifecycleEvent) -> None:
         if self._on_lifecycle:
             await self._on_lifecycle(event)
@@ -47,13 +90,15 @@ class CogneeMemoryClient:
         start = time.perf_counter()
         text = payload.to_remember_text()
 
-        await cognee.remember(text, dataset_name=self.dataset)
+        ds = self.athlete_dataset(payload.athlete_id)
+        async with cognee_exclusive():
+            await cognee.remember(text, dataset_name=ds)
 
         self._memory_count += 1
         ref = MemoryRef(
             athlete_id=payload.athlete_id,
             session_id=payload.session_id,
-            cognee_dataset=self.dataset,
+            cognee_dataset=ds,
             summary=payload.content.summary,
         )
 
@@ -72,8 +117,51 @@ class CogneeMemoryClient:
             op=LifecycleOperation.GRAPH_UPDATED,
             message="Knowledge graph updated after remember()",
             athlete_id=payload.athlete_id,
-            nodes=self._memory_count * 3,
-            edges=self._memory_count * 5,
+        ))
+        return ref
+
+    async def remember_and_improve(self, payload: MemoryPayload) -> MemoryRef:
+        """Store memory and run improve under a single Cognee lock (for workers)."""
+        start = time.perf_counter()
+        text = payload.to_remember_text()
+        ds = self.athlete_dataset(payload.athlete_id)
+
+        async with cognee_exclusive():
+            await cognee.remember(text, dataset_name=ds)
+            await cognee.improve(dataset=ds)
+
+        self._memory_count += 1
+        ref = MemoryRef(
+            athlete_id=payload.athlete_id,
+            session_id=payload.session_id,
+            cognee_dataset=ds,
+            summary=payload.content.summary,
+        )
+
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        logger.info(
+            "remember_and_improve() for athlete=%s session=%s (%dms)",
+            payload.athlete_id,
+            payload.session_id,
+            latency_ms,
+        )
+
+        await self._emit(LifecycleEvent(
+            op=LifecycleOperation.REMEMBER,
+            message=f"{payload.content.summary[:80]}",
+            athlete_id=payload.athlete_id,
+            session_id=payload.session_id,
+            delta=1,
+        ))
+        await self._emit(LifecycleEvent(
+            op=LifecycleOperation.IMPROVE,
+            message="Merged and enriched athlete memories",
+            athlete_id=payload.athlete_id,
+        ))
+        await self._emit(LifecycleEvent(
+            op=LifecycleOperation.GRAPH_UPDATED,
+            message="Knowledge graph updated after remember_and_improve()",
+            athlete_id=payload.athlete_id,
         ))
         return ref
 
@@ -83,19 +171,27 @@ class CogneeMemoryClient:
         if query.athlete_id:
             search_text = f"Athlete {query.athlete_id}: {query.text}"
 
-        raw = await cognee.recall(search_text, top_k=query.limit, datasets=[self.dataset])
+        if not query.athlete_id:
+            logger.warning("recall() without athlete_id — using base dataset only")
+        ds = self._resolve_dataset(query.athlete_id)
+        async with cognee_exclusive():
+            raw = await cognee.recall(search_text, top_k=query.limit, datasets=[ds])
 
         sources: list[RecallSource] = []
         if isinstance(raw, list):
             for i, item in enumerate(raw[: query.limit]):
-                summary = str(item)[:500]
+                summary = _recall_item_to_text(item)
+                if not summary:
+                    continue
                 sources.append(RecallSource(
                     memory_id=f"recall_{i}",
-                    summary=summary,
+                    summary=summary[:2000],
                     session_id=query.session_id,
                 ))
         elif raw is not None:
-            sources.append(RecallSource(summary=str(raw)[:500]))
+            summary = _recall_item_to_text(raw)
+            if summary:
+                sources.append(RecallSource(summary=summary[:2000]))
 
         latency_ms = int((time.perf_counter() - start) * 1000)
         logger.info("recall() returned %d results (%dms)", len(sources), latency_ms)
@@ -115,7 +211,9 @@ class CogneeMemoryClient:
 
     async def improve(self, athlete_id: str | None = None) -> None:
         start = time.perf_counter()
-        await cognee.improve(dataset=self.dataset)
+        ds = self._resolve_dataset(athlete_id)
+        async with cognee_exclusive():
+            await cognee.improve(dataset=ds)
         latency_ms = int((time.perf_counter() - start) * 1000)
         logger.info("improve() completed (%dms)", latency_ms)
 
@@ -128,18 +226,19 @@ class CogneeMemoryClient:
             op=LifecycleOperation.GRAPH_UPDATED,
             message="Knowledge graph strengthened after improve()",
             athlete_id=athlete_id,
-            nodes=self._memory_count * 3 + 2,
-            edges=self._memory_count * 5 + 4,
         ))
 
     async def forget(self, policy: ForgetPolicy) -> None:
         start = time.perf_counter()
         # Cognee forget operates at dataset level; scoped policies are applied upstream
-        if policy.session_id or policy.athlete_id:
-            logger.info("forget() scoped archive for athlete=%s session=%s",
-                        policy.athlete_id, policy.session_id)
-        else:
-            await cognee.forget(dataset=self.dataset)
+        async with cognee_exclusive():
+            if policy.athlete_id:
+                await cognee.forget(dataset=self.athlete_dataset(policy.athlete_id))
+                logger.info("forget() cleared dataset for athlete=%s", policy.athlete_id)
+            elif policy.session_id:
+                logger.info("forget() session-scoped archive for session=%s", policy.session_id)
+            else:
+                await cognee.forget(dataset=self.dataset)
 
         latency_ms = int((time.perf_counter() - start) * 1000)
         logger.info("forget() completed (%dms)", latency_ms)

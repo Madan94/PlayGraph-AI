@@ -5,7 +5,7 @@ import json
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -64,21 +64,26 @@ async def generate_report(
     """Generate session report: recall() memories → PDF with evidence."""
     recall = await lifecycle.recall_for_coach(
         body.athlete_id,
-        "performance summary injuries coach notes recommendations training timeline cricket",
+        "performance summary injuries coach notes recommendations training timeline progress",
     )
 
-    performance = "\n".join(f"• {s.summary}" for s in recall.sources[:5]) or "No performance data recalled."
-    evidence = "\n".join(f"• {s.summary}" for s in recall.sources) or "No evidence memories."
+    if not recall.sources:
+        raise HTTPException(
+            status_code=404,
+            detail="No recalled memories for this athlete — upload session data first",
+        )
 
-    sections = [
-        ("Performance Summary", performance),
-        ("Historical Trend", "Trend analysis based on recalled session memories across training blocks."),
-        ("Coach Notes", "Notes extracted from recalled coach feedback and session summaries."),
-        ("Recommendations", "Continue cover drive drills. Monitor hamstring load. Increase sprint intervals."),
-        ("Evidence — Recalled Memories", evidence),
-    ]
+    athlete_row = await db.execute(
+        text("SELECT name FROM athletes WHERE id = CAST(:id AS uuid)"),
+        {"id": body.athlete_id},
+    )
+    athlete = athlete_row.first()
+    athlete_name = athlete.name if athlete else body.athlete_id
 
-    pdf_bytes = _build_pdf("NextPlayAI Session Report — Rahul Sharma", sections)
+    evidence = "\n".join(f"• {s.summary}" for s in recall.sources)
+    sections = [("Recalled Memories (Cognee)", evidence)]
+
+    pdf_bytes = _build_pdf(f"NextPlayAI Session Report — {athlete_name}", sections)
     key = f"reports/{body.athlete_id}/{uuid.uuid4()}.pdf"
     upload_file(key, pdf_bytes, "application/pdf")
 

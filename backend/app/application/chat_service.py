@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from pydantic import BaseModel
 
-from backend.app.core.deps import get_lifecycle_service
 from backend.app.infrastructure.llm import generate_coach_answer
 from memory.lifecycle import MemoryLifecycleService
 
@@ -29,7 +26,14 @@ class ChatService:
     def __init__(self, lifecycle: MemoryLifecycleService) -> None:
         self.lifecycle = lifecycle
 
-    async def coach_chat(self, athlete_id: str, message: str) -> ChatResponse:
+    async def coach_chat(
+        self,
+        athlete_id: str,
+        message: str,
+        *,
+        athlete_name: str = "the athlete",
+        sport: str = "athletics",
+    ) -> ChatResponse:
         recall_result = await self.lifecycle.recall_for_coach(athlete_id, message)
 
         context_parts = [
@@ -37,7 +41,12 @@ class ChatService:
         ]
         memory_context = "\n".join(context_parts) if context_parts else "No memories found."
 
-        answer = await generate_coach_answer(message, memory_context)
+        answer = await generate_coach_answer(
+            message,
+            memory_context,
+            sport=sport,
+            athlete_name=athlete_name,
+        )
 
         sources = [
             ChatSource(

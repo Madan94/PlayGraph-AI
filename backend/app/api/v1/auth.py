@@ -38,13 +38,9 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Demo mode: accept any password for seeded users
-    if not body.password and user.password_hash.startswith("$2b$"):
-        pass
-    elif not pwd_context.verify(body.password, user.password_hash) and "demo" not in body.password:
-        # Allow 'demo' password for hackathon
-        if body.password != "demo":
-            raise HTTPException(status_code=401, detail="Invalid credentials")
+    # Verify credentials (bcrypt hash stored in Postgres)
+    if not pwd_context.verify(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
 
     expire = datetime.utcnow() + timedelta(minutes=settings.jwt_expire_minutes)
     token = jwt.encode(

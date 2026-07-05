@@ -28,7 +28,20 @@ async def coach_chat(
     db: AsyncSession = Depends(get_db),
 ):
     """Coach Q&A: recall() → Qwen LLM → grounded answer with sources."""
-    result = await chat.coach_chat(body.athlete_id, body.message)
+    athlete_row = await db.execute(
+        text("SELECT name, sport FROM athletes WHERE id = CAST(:id AS uuid)"),
+        {"id": body.athlete_id},
+    )
+    athlete = athlete_row.first()
+    athlete_name = athlete.name if athlete else "the athlete"
+    sport = athlete.sport if athlete else "athletics"
+
+    result = await chat.coach_chat(
+        body.athlete_id,
+        body.message,
+        athlete_name=athlete_name,
+        sport=sport,
+    )
 
     await db.execute(
         text("""

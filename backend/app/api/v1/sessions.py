@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,14 +13,13 @@ from backend.app.infrastructure.minio_client import upload_file
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
-DEMO_ATHLETE_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-
 
 class CreateSessionRequest(BaseModel):
-    athlete_id: str = DEMO_ATHLETE_ID
+    athlete_id: str
     title: str
     type: str = "training"
-    sport: str = "cricket"
+    sport: str = "unknown"
+    description: str | None = None
 
 
 @router.post("")
@@ -28,8 +27,11 @@ async def create_session(body: CreateSessionRequest, db: AsyncSession = Depends(
     session_id = str(uuid.uuid4())
     await db.execute(
         text("""
-            INSERT INTO sessions (id, athlete_id, type, sport, title, status)
-            VALUES (CAST(:id AS uuid), CAST(:athlete_id AS uuid), :type, :sport, :title, 'pending')
+            INSERT INTO sessions (id, athlete_id, type, sport, title, description, status)
+            VALUES (
+                CAST(:id AS uuid), CAST(:athlete_id AS uuid), :type, :sport, :title,
+                :description, 'pending'
+            )
         """),
         {
             "id": session_id,
@@ -37,10 +39,11 @@ async def create_session(body: CreateSessionRequest, db: AsyncSession = Depends(
             "type": body.type,
             "sport": body.sport,
             "title": body.title,
+            "description": body.description,
         },
     )
     await db.commit()
-    return {"id": session_id, "status": "pending"}
+    return {"id": session_id, "status": "pending", "athlete_id": body.athlete_id}
 
 
 @router.post("/{session_id}/assets")
@@ -50,8 +53,23 @@ async def upload_asset(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
+    session_row = await db.execute(
+        text("""
+            SELECT s.athlete_id, s.sport, s.title, s.description, a.name AS athlete_name
+            FROM sessions s
+            JOIN athletes a ON a.id = s.athlete_id
+            WHERE s.id = CAST(:id AS uuid)
+        """),
+        {"id": session_id},
+    )
+    session = session_row.first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    athlete_id = str(session.athlete_id)
     content = await file.read()
-    key = f"sessions/{session_id}/{uuid.uuid4()}_{file.filename}"
+    original_filename = file.filename or "upload"
+    key = f"sessions/{session_id}/{uuid.uuid4()}_{original_filename}"
     upload_file(key, content, file.content_type or "application/octet-stream")
 
     asset_id = str(uuid.uuid4())
@@ -84,18 +102,24 @@ async def upload_asset(
     )
     await db.commit()
 
-    # Publish to Kafka (best-effort)
+    kafka_payload = {
+        "session_id": session_id,
+        "asset_id": asset_id,
+        "minio_key": key,
+        "asset_type": asset_type,
+        "athlete_id": athlete_id,
+        "sport": session.sport,
+        "session_title": session.title,
+        "athlete_name": session.athlete_name,
+        "description": session.description,
+        "original_filename": original_filename,
+    }
+
     try:
         from backend.app.infrastructure.kafka import publish_event
-        await publish_event(topic, {
-            "session_id": session_id,
-            "asset_id": asset_id,
-            "minio_key": key,
-            "asset_type": asset_type,
-            "athlete_id": DEMO_ATHLETE_ID,
-        })
+        await publish_event(topic, kafka_payload)
     except Exception:
-        pass  # Worker can poll ingestion_jobs as fallback
+        pass
 
     return {"asset_id": asset_id, "job_id": job_id, "status": "queued", "topic": topic}
 
@@ -103,7 +127,10 @@ async def upload_asset(
 @router.get("/{session_id}")
 async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
-        text("SELECT id, athlete_id, title, type, sport, status, started_at FROM sessions WHERE id = CAST(:id AS uuid)"),
+        text("""
+            SELECT id, athlete_id, title, type, sport, description, status, started_at
+            FROM sessions WHERE id = CAST(:id AS uuid)
+        """),
         {"id": session_id},
     )
     row = result.first()

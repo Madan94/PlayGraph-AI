@@ -1,0 +1,11 @@
+**/.venv
+**/__pycache__
+**/*.pyc
+.git
+.cognee_data
+.cognee_system
+frontend/node_modules
+frontend/.next
+**/.env
+*.md
+.cursor

@@ -1,31 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import { chatApi, DEMO_ATHLETE_ID } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { athletesApi, chatApi, type Athlete } from "@/lib/api";
 
 export default function ChatPage() {
-  const [query, setQuery] = useState("How has Rahul improved?");
+  const [athletes, setAthletes] = useState<Athlete[]>([]);
+  const [athleteId, setAthleteId] = useState("");
+  const [query, setQuery] = useState("");
   const [result, setResult] = useState<Awaited<ReturnType<typeof chatApi.ask>> | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const DEMO_QUERIES = [
-    "How has Rahul improved?",
-    "What injuries affected performance?",
-    "Compare last five matches.",
-    "What drills should Rahul practice?",
-  ];
+  useEffect(() => {
+    athletesApi.list().then((d) => {
+      setAthletes(d.athletes);
+      if (d.athletes[0]) setAthleteId(d.athletes[0].id);
+    });
+  }, []);
 
   async function ask(q: string) {
+    if (!athleteId) {
+      setError("Select an athlete first");
+      return;
+    }
     setQuery(q);
     setLoading(true);
+    setError(null);
     try {
-      const data = await chatApi.ask(DEMO_ATHLETE_ID, q);
+      const data = await chatApi.ask(athleteId, q);
       setResult(data);
-    } catch {
-      setResult({
-        answer: "Failed — ensure backend and Cognee are running. Seed demo memories first.",
-        recall: { query: q, memories_used: 0, sources: [] },
-      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Chat failed");
+      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -34,17 +40,22 @@ export default function ChatPage() {
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-1">Coach Chat</h1>
-      <p className="text-foreground/50 mb-8">recall() → Qwen LLM → grounded answer</p>
-
-      <div className="flex flex-wrap gap-2 mb-6">
-        {DEMO_QUERIES.map((q) => (
-          <button key={q} onClick={() => ask(q)} className="text-xs px-3 py-1.5 rounded-lg glass hover:bg-white/10">
-            {q}
-          </button>
-        ))}
-      </div>
+      <p className="text-foreground/50 mb-8">recall() → LLM → grounded answer</p>
 
       <div className="glass rounded-2xl p-4 mb-4">
+        <label className="text-xs text-foreground/50 block mb-2">Athlete</label>
+        <select
+          value={athleteId}
+          onChange={(e) => setAthleteId(e.target.value)}
+          className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm mb-4 outline-none"
+        >
+          <option value="">Select athlete…</option>
+          {athletes.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -53,19 +64,18 @@ export default function ChatPage() {
         />
         <button
           onClick={() => ask(query)}
-          disabled={loading}
+          disabled={loading || !query.trim()}
           className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple to-cyan text-sm font-medium disabled:opacity-50"
         >
           {loading ? "Recalling + generating…" : "Ask Coach"}
         </button>
+        {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
       </div>
 
       {result && (
         <div className="glass rounded-2xl p-6 space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-mono text-cyan px-2 py-0.5 rounded bg-cyan/10">recall()</span>
-            <span className="text-foreground/40">→</span>
-            <span className="font-mono text-purple-light px-2 py-0.5 rounded bg-purple/10">Qwen LLM</span>
             <span className="text-foreground/50">· {result.recall.memories_used} memories</span>
           </div>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{result.answer}</p>

@@ -38,6 +38,7 @@ CREATE TABLE sessions (
     type VARCHAR(64) NOT NULL DEFAULT 'training',
     sport VARCHAR(64) NOT NULL DEFAULT 'cricket',
     title VARCHAR(255) NOT NULL,
+    description TEXT,
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     status session_status NOT NULL DEFAULT 'pending',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -83,16 +84,7 @@ CREATE TABLE reports (
     generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Demo seed data
-INSERT INTO users (id, email, password_hash, role, full_name) VALUES
-    ('11111111-1111-1111-1111-111111111111', 'coach@nextplay.ai', '$2b$12$demo_hash_placeholder', 'coach', 'Marcus Chen'),
-    ('22222222-2222-2222-2222-222222222222', 'rahul@nextplay.ai', '$2b$12$demo_hash_placeholder', 'athlete', 'Rahul Sharma');
-
-INSERT INTO athletes (id, user_id, name, sport, metadata) VALUES
-    ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '22222222-2222-2222-2222-222222222222', 'Rahul Sharma', 'cricket', '{"position": "batsman", "team": "Apex United"}');
-
-INSERT INTO coach_athlete (coach_id, athlete_id) VALUES
-    ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+-- Add users and athletes via your own migration or admin tooling (no seed data).
 
 CREATE INDEX idx_sessions_athlete ON sessions(athlete_id);
 CREATE INDEX idx_memory_ops_athlete ON memory_operations_log(athlete_id);

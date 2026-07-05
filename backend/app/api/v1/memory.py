@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -30,10 +29,6 @@ class RecallRequest(BaseModel):
     athlete_id: str
     query: str
     limit: int = 10
-
-
-class DemoSeedRequest(BaseModel):
-    athlete_id: str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
 
 @router.post("/remember")
@@ -112,30 +107,3 @@ async def memory_stats(db: AsyncSession = Depends(get_db)):
         "cognee_dataset": get_memory_client().dataset,
     }
 
-
-@router.post("/seed-demo")
-async def seed_demo_data(
-    body: DemoSeedRequest,
-    lifecycle: MemoryLifecycleService = Depends(get_lifecycle_service),
-):
-    """Seed cricket demo memories for hackathon judges."""
-    athlete_id = body.athlete_id
-    memories = [
-        ("Rahul scored 78 off 52 balls with strike rate 150 in net session", {"runs": 78, "strike_rate": 150}),
-        ("Cover drive technique improved — coach noted better head position", {"drill": "cover_drive", "rating": 8}),
-        ("GPS data: 4.2km covered, peak HR 178 bpm during fielding drills", {"distance_km": 4.2, "peak_hr": 178}),
-        ("Minor hamstring tightness reported post-session — monitoring recommended", {"injury": "hamstring", "severity": "minor"}),
-        ("Sprint between wickets averaged 28.3 km/h — up 6% from last month", {"sprint_speed_kmh": 28.3, "improvement_pct": 6}),
-    ]
-    session_id = str(uuid.uuid4())
-    for summary, metrics in memories:
-        payload = MemoryPayload(
-            athlete_id=athlete_id,
-            session_id=session_id,
-            memory_type=MemoryType.PERFORMANCE_METRIC,
-            source_worker="demo_seed",
-            content=MemoryContent(summary=summary, metrics=metrics, entities=[f"athlete:{athlete_id}"]),
-        )
-        await lifecycle.ingest_worker_output(payload)
-
-    return {"status": "ok", "memories_seeded": len(memories), "session_id": session_id}

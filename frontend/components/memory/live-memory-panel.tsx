@@ -34,7 +34,7 @@ const OP_LABELS: Record<string, string> = {
 export function LiveMemoryPanel() {
   const [events, setEvents] = useState<LifecycleEvent[]>([]);
   const [connected, setConnected] = useState(false);
-  const [stats, setStats] = useState({ remember: 0, recall: 0, improve: 0, forget: 0, nodes: 0, edges: 0 });
+  const [stats, setStats] = useState({ remember: 0, recall: 0, improve: 0, forget: 0 });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,10 +52,6 @@ export function LiveMemoryPanel() {
           if (data.op === "recall") next.recall += 1;
           if (data.op === "improve") next.improve += 1;
           if (data.op === "forget") next.forget += 1;
-          if (data.op === "graph_updated") {
-            next.nodes = data.nodes ?? next.nodes;
-            next.edges = data.edges ?? next.edges;
-          }
           return next;
         });
       } catch {
@@ -93,20 +89,13 @@ export function LiveMemoryPanel() {
         ))}
       </div>
 
-      {(stats.nodes > 0 || stats.edges > 0) && (
-        <div className="px-3 py-2 border-b border-white/5 flex gap-4 text-[10px] text-foreground/50">
-          <span>Graph: {stats.nodes} nodes</span>
-          <span>{stats.edges} edges</span>
-        </div>
-      )}
-
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2">
         <AnimatePresence initial={false}>
           {events.length === 0 ? (
             <p className="text-xs text-foreground/30 text-center py-12">
               Waiting for Cognee memory events…
               <br />
-              <span className="text-[10px]">Seed demo data to begin</span>
+              <span className="text-[10px]">Upload a session to begin</span>
             </p>
           ) : (
             events.map((event, i) => (

@@ -2,16 +2,27 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# OpenCV (headless) + build deps for cognee/native wheels
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev \
+    build-essential \
+    libpq-dev \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY workers/requirements.txt /app/workers/requirements.txt
-COPY backend/requirements.txt /app/backend/requirements.txt
-RUN pip install --no-cache-dir -r /app/workers/requirements.txt
+COPY memory/requirements.txt /app/memory/requirements.txt
+RUN pip install --no-cache-dir \
+    -r /app/memory/requirements.txt \
+    -r /app/workers/requirements.txt
 
 COPY memory /app/memory
 COPY workers /app/workers
 
 ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
 CMD ["python", "-m", "workers.main"]
