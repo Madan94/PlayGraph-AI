@@ -3,16 +3,17 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from backend.app.core.security import CurrentUser, get_current_user
 from backend.app.infrastructure.event_bus import event_bus
 
 router = APIRouter(prefix="/memory", tags=["memory-stream"])
 
 
 @router.get("/stream")
-async def memory_stream():
+async def memory_stream(user: CurrentUser = Depends(get_current_user)):
     """SSE endpoint for Live Memory Panel — hackathon centerpiece."""
 
     async def generator():

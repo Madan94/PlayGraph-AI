@@ -8,7 +8,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.application.chat_service import ChatRequest, ChatResponse, ChatService
+from backend.app.core.access import assert_athlete_access
 from backend.app.core.deps import get_lifecycle_service
+from backend.app.core.security import CurrentUser, get_current_user
 from backend.app.infrastructure.database import get_db
 from memory.lifecycle import MemoryLifecycleService
 
@@ -24,10 +26,12 @@ def get_chat_service(
 @router.post("", response_model=ChatResponse)
 async def coach_chat(
     body: ChatRequest,
+    user: CurrentUser = Depends(get_current_user),
     chat: ChatService = Depends(get_chat_service),
     db: AsyncSession = Depends(get_db),
 ):
-    """Coach Q&A: recall() → Qwen LLM → grounded answer with sources."""
+    await assert_athlete_access(db, user, body.athlete_id)
+
     athlete_row = await db.execute(
         text("SELECT name, sport FROM athletes WHERE id = CAST(:id AS uuid)"),
         {"id": body.athlete_id},
@@ -69,9 +73,11 @@ class TimelineEntry(BaseModel):
 @router.get("/timeline/{athlete_id}")
 async def athlete_timeline(
     athlete_id: str,
+    user: CurrentUser = Depends(get_current_user),
     lifecycle: MemoryLifecycleService = Depends(get_lifecycle_service),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Performance timeline powered entirely by recall()."""
+    await assert_athlete_access(db, user, athlete_id)
     result = await lifecycle.recall_timeline(athlete_id)
     return {
         "athlete_id": athlete_id,

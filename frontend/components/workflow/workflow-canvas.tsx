@@ -17,7 +17,7 @@ export function WorkflowCanvas() {
   const [edges, , onEdgesChange] = useEdgesState(initialEdges);
 
   return (
-    <div className="h-[calc(100vh-8rem)] w-full rounded-2xl border border-white/10 overflow-hidden">
+    <div className="h-[calc(100vh-8rem)] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -29,13 +29,14 @@ export function WorkflowCanvas() {
         minZoom={0.4}
         maxZoom={1.5}
         proOptions={{ hideAttribution: true }}
+        className="bg-white"
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(255,255,255,0.04)" />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(15,23,42,0.08)" />
         <Controls showInteractive={false} />
         <MiniMap
-          nodeColor={(n) => (n.type === "cognee" ? "#7C3AED" : "#27272A")}
-          maskColor="rgba(9,9,11,0.85)"
-          className="!rounded-xl !border !border-white/10"
+          nodeColor={(n) => (n.type === "cognee" ? "#7C3AED" : "#CBD5E1")}
+          maskColor="rgba(255,255,255,0.85)"
+          className="!rounded-xl !border !border-slate-200 !bg-white"
         />
       </ReactFlow>
     </div>

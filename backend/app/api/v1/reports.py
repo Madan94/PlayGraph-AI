@@ -11,7 +11,9 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.core.access import assert_athlete_access
 from backend.app.core.deps import get_lifecycle_service
+from backend.app.core.security import CurrentUser, get_current_user
 from backend.app.infrastructure.database import get_db
 from backend.app.infrastructure.minio_client import upload_file
 from memory.lifecycle import MemoryLifecycleService
@@ -58,9 +60,11 @@ def _build_pdf(title: str, sections: list[tuple[str, str]]) -> bytes:
 @router.post("/generate")
 async def generate_report(
     body: ReportRequest,
+    user: CurrentUser = Depends(get_current_user),
     lifecycle: MemoryLifecycleService = Depends(get_lifecycle_service),
     db: AsyncSession = Depends(get_db),
 ):
+    await assert_athlete_access(db, user, body.athlete_id)
     """Generate session report: recall() memories → PDF with evidence."""
     recall = await lifecycle.recall_for_coach(
         body.athlete_id,

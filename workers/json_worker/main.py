@@ -1,4 +1,4 @@
-"""JSON worker — processes wearable/GPS/HR payloads → remember()."""
+"""JSON worker — processes wearable/GPS/HR payloads → backend memory ingest."""
 
 from __future__ import annotations
 
@@ -15,9 +15,8 @@ load_project_env()
 
 from aiokafka import AIOKafkaConsumer
 
+from memory.ingest_client import ingest_via_backend
 from memory.schemas import MemoryContent, MemoryPayload, MemoryType
-from memory.lifecycle import MemoryLifecycleService
-from memory.cognee_client import CogneeMemoryClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,9 +46,6 @@ def _download_json_from_minio(minio_key: str) -> dict:
 
 
 async def process_json_payload(session_id: str, asset_id: str, data: dict, context: dict) -> None:
-    client = CogneeMemoryClient(dataset=os.getenv("COGNEE_DATASET", "nextplay_ai"))
-    lifecycle = MemoryLifecycleService(client)
-
     gps = data.get("gps", {})
     hr = data.get("heart_rate", data.get("hr", {}))
     accel = data.get("acceleration", {})
@@ -98,8 +94,8 @@ async def process_json_payload(session_id: str, asset_id: str, data: dict, conte
         source_worker="json_worker",
         content=MemoryContent(summary=summary, metrics=metrics, entities=entities),
     )
-    await lifecycle.ingest_worker_output(payload)
-    logger.info("JSON worker → remember() for session %s", session_id)
+    await ingest_via_backend(payload)
+    logger.info("JSON worker → ingest for session %s", session_id)
 
 
 async def main() -> None:

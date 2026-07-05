@@ -6,11 +6,12 @@ CREATE TYPE user_role AS ENUM ('athlete', 'coach', 'scout', 'admin');
 CREATE TYPE session_status AS ENUM ('pending', 'processing', 'completed', 'failed');
 CREATE TYPE asset_type AS ENUM ('video', 'audio', 'image', 'json', 'note');
 CREATE TYPE memory_operation AS ENUM ('remember', 'recall', 'improve', 'forget');
+CREATE TYPE otp_purpose AS ENUM ('signup', 'login');
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
     role user_role NOT NULL DEFAULT 'athlete',
     full_name VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -84,8 +85,44 @@ CREATE TABLE reports (
     generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE otp_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) NOT NULL,
+    code_hash VARCHAR(255) NOT NULL,
+    purpose otp_purpose NOT NULL,
+    role user_role NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    consumed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE auth_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    jti VARCHAR(64) UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE coach_invites (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    coach_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code VARCHAR(16) UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ,
+    max_uses INTEGER NOT NULL DEFAULT 10,
+    uses INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Add users and athletes via your own migration or admin tooling (no seed data).
 
 CREATE INDEX idx_sessions_athlete ON sessions(athlete_id);
 CREATE INDEX idx_memory_ops_athlete ON memory_operations_log(athlete_id);
 CREATE INDEX idx_memory_ops_created ON memory_operations_log(created_at DESC);
+CREATE INDEX idx_otp_requests_email ON otp_requests(email, purpose, created_at DESC);
+CREATE INDEX idx_auth_sessions_jti ON auth_sessions(jti);
+CREATE INDEX idx_auth_sessions_user ON auth_sessions(user_id);
+CREATE INDEX idx_coach_invites_code ON coach_invites(code);
+CREATE INDEX idx_athletes_user ON athletes(user_id);
