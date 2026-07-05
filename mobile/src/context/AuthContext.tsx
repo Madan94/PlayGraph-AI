@@ -51,6 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // Best-effort backend JWT revocation — don't block logout if request fails
+    authApi.logout().catch(() => {});
     await SecureStore.deleteItemAsync(SESSION_KEY);
     setAuthToken(null);
     setSession(null);

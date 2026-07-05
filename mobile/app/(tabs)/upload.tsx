@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { sessionsApi } from "@/api/sessions";
 import { ApiError } from "@/api/client";
-import { AssetType } from "@/api/types";
+import { AssetType, SessionDetail } from "@/api/types";
 import { DEMO_ATHLETE_ID } from "@/config/env";
 import { useMediaCapture } from "@/hooks/useMediaCapture";
 import { SelectedMedia } from "@/types/media";
@@ -28,6 +28,8 @@ export default function UploadScreen() {
   const [state, setState] = useState<UploadState>("idle");
   const [progress, setProgress] = useState(0);
   const [resultTopic, setResultTopic] = useState<string | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<SessionDetail | null>(null);
+  const [uploadedSessionId, setUploadedSessionId] = useState<string | null>(null);
 
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(recorder, 200);
@@ -69,12 +71,24 @@ export default function UploadScreen() {
     if (!media) return;
     setState("uploading");
     setProgress(0);
+    setSessionStatus(null);
+    setUploadedSessionId(null);
     try {
       const session = await sessionsApi.create(DEMO_ATHLETE_ID, title);
       const asset = await sessionsApi.uploadAsset(session.id, media.uri, media.assetType, media.mimeType, setProgress);
       setResultTopic(asset.topic);
+      setUploadedSessionId(session.id);
       setState("success");
       toast.show("Upload complete — ingestion started", "success");
+      // Poll session status once after a short delay
+      setTimeout(async () => {
+        try {
+          const detail = await sessionsApi.get(session.id);
+          setSessionStatus(detail);
+        } catch {
+          // silently ignore status poll failure
+        }
+      }, 3000);
     } catch (e) {
       setState("error");
       toast.show(e instanceof ApiError ? e.message : "Upload failed", "error");
@@ -148,6 +162,15 @@ export default function UploadScreen() {
                 <Text style={{ fontFamily: "monospace", color: theme.emeraldLight }}>{resultTopic}</Text>
               </Text>
             </View>
+            {sessionStatus && (
+              <>
+                <View style={{ height: 12 }} />
+                <View style={[styles.statusRow, { backgroundColor: theme.surface }]}>
+                  <Text style={[styles.statusLabel, { color: theme.muted }]}>Session status</Text>
+                  <Text style={[styles.statusValue, { color: theme.cyan }]}>{sessionStatus.status}</Text>
+                </View>
+              </>
+            )}
             <View style={{ height: 12 }} />
             <GradientButton
               label="View in Timeline"
@@ -199,4 +222,7 @@ const styles = StyleSheet.create({
   progressFill: { height: "100%", borderRadius: 4 },
   successRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   successText: { fontSize: 13, flex: 1, lineHeight: 19 },
+  statusRow: { flexDirection: "row", justifyContent: "space-between", borderRadius: 8, padding: 10 },
+  statusLabel: { fontSize: 12 },
+  statusValue: { fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
 });

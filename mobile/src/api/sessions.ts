@@ -2,7 +2,7 @@ import { FileSystemUploadType, createUploadTask } from "expo-file-system/legacy"
 import { API_URL } from "@/config/env";
 import { api } from "./client";
 import { getAuthToken } from "./tokenStore";
-import { AssetType, CreateSessionResponse, UploadAssetResponse } from "./types";
+import { AssetType, CreateSessionResponse, SessionDetail, UploadAssetResponse } from "./types";
 
 export const sessionsApi = {
   create: (athlete_id: string, title: string, type = "training", sport = "cricket") =>
@@ -10,6 +10,9 @@ export const sessionsApi = {
       method: "POST",
       body: JSON.stringify({ athlete_id, title, type, sport }),
     }),
+
+  get: (sessionId: string) =>
+    api<SessionDetail>(`/api/v1/sessions/${sessionId}`),
 
   uploadAsset: async (
     sessionId: string,

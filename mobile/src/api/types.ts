@@ -53,3 +53,56 @@ export interface UploadAssetResponse {
   status: string;
   topic: string;
 }
+
+export interface SessionDetail {
+  id: string;
+  athlete_id: string;
+  title: string;
+  type: string;
+  sport: string;
+  description: string | null;
+  status: string;
+  started_at: string;
+}
+
+export interface Athlete {
+  id: string;
+  name: string;
+  sport: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AthleteListResponse {
+  athletes: Athlete[];
+}
+
+export interface Invite {
+  code: string;
+  expires_at: string | null;
+  max_uses: number;
+  uses: number;
+  created_at: string | null;
+}
+
+export interface InviteListResponse {
+  invites: Invite[];
+}
+
+export interface CreateInviteResponse {
+  code: string;
+  expires_at: string | null;
+  max_uses: number;
+}
+
+export interface MemoryStats {
+  operations: Record<string, number>;
+  cognee_dataset: string;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  role: string;
+  full_name: string | null;
+  athlete_id: string | null;
+}

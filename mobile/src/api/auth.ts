@@ -1,5 +1,5 @@
 import { api } from "./client";
-import { TokenResponse } from "./types";
+import { TokenResponse, UserProfile } from "./types";
 
 export const authApi = {
   login: (email: string, password: string) =>
@@ -7,4 +7,10 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+
+  logout: () =>
+    api<void>("/api/v1/auth/logout", { method: "POST" }),
+
+  me: () =>
+    api<UserProfile>("/api/v1/auth/me"),
 };

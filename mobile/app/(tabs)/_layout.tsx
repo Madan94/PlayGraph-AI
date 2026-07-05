@@ -10,6 +10,8 @@ export default function TabsLayout() {
 
   if (!session) return <Redirect href="/login" />;
 
+  const isCoach = session.role === "coach";
+
   return (
     <Tabs
       screenOptions={{
@@ -34,6 +36,23 @@ export default function TabsLayout() {
         options={{
           title: "Coach Chat",
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubble-ellipses-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="athletes"
+        options={{
+          title: "Athletes",
+          href: isCoach ? undefined : null,
+          tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="invites"
+        options={{
+          title: isCoach ? "Invites" : "Join Coach",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name={isCoach ? "mail-outline" : "person-add-outline"} size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
