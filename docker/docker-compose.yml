@@ -1,5 +1,38 @@
-# Full stack. Cognee: set COGNEE_MODE=cloud in ../.env for managed memory (no local Cognee volumes).
-# For embedded mode, uncomment cognee_data/cognee_system volumes on backend and set DATA_ROOT_* in .env.
+# Full stack: infra + backend + all workers in Docker.
+# Cognee Cloud: set COGNEE_MODE=cloud in ../.env (no local Cognee volumes).
+#
+# Usage:
+#   cd docker
+#   docker compose up -d --build
+#
+# Backend API: http://localhost:8000
+# For hybrid dev (backend on host:8002), use docker-compose.workers.yml instead.
+
+x-worker-env: &worker-env
+  KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_BUCKET: nextplay-assets
+  MINIO_SECURE: "false"
+  ENABLE_BACKEND_ACCESS_CONTROL: "false"
+  COGNEE_MODE: cloud
+  PLAYGRAPH_API_URL: http://backend:8000
+
+x-worker-base: &worker-base
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile.worker
+  env_file:
+    - ../.env
+  restart: unless-stopped
+  depends_on:
+    redpanda:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+    backend:
+      condition: service_started
 
 services:
   postgres:
@@ -69,6 +102,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://nextplay:nextplay@postgres:5432/nextplay
       MINIO_ENDPOINT: minio:9000
       KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+      PLAYGRAPH_API_URL: http://backend:8000
     volumes:
       - ../memory:/app/memory
       - ../backend:/app/backend
@@ -81,48 +115,28 @@ services:
         condition: service_healthy
 
   json-worker:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.worker
-    env_file:
-      - ../.env
+    <<: *worker-base
     environment:
+      <<: *worker-env
       WORKER_TYPE: json
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: nextplay-assets
-      MINIO_SECURE: "false"
-      ENABLE_BACKEND_ACCESS_CONTROL: "false"
-    restart: unless-stopped
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
 
   video-worker:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.worker
-    env_file:
-      - ../.env
+    <<: *worker-base
     environment:
+      <<: *worker-env
       WORKER_TYPE: video
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: nextplay-assets
-      MINIO_SECURE: "false"
-      ENABLE_BACKEND_ACCESS_CONTROL: "false"
-    restart: unless-stopped
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
+
+  image-worker:
+    <<: *worker-base
+    environment:
+      <<: *worker-env
+      WORKER_TYPE: image
+
+  audio-worker:
+    <<: *worker-base
+    environment:
+      <<: *worker-env
+      WORKER_TYPE: audio
 
 volumes:
   postgres_data:

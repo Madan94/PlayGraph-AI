@@ -8,6 +8,10 @@ if worker_type == "json":
     from workers.json_worker.main import main
 elif worker_type == "video":
     from workers.video_worker.main import main
+elif worker_type == "image":
+    from workers.image_worker.main import main
+elif worker_type == "audio":
+    from workers.audio_worker.main import main
 else:
     print(f"Unknown worker type: {worker_type}", file=sys.stderr)
     sys.exit(1)

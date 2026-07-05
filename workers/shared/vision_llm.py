@@ -53,6 +53,42 @@ def _chat(messages: list[dict], model: str, max_tokens: int = 1200) -> str:
     return response.json()["choices"][0]["message"]["content"].strip()
 
 
+def analyze_image(
+    image_bytes: bytes,
+    *,
+    mime_type: str,
+    sport: str,
+    athlete_name: str | None,
+    session_title: str | None,
+    description: str | None,
+) -> dict:
+    """Analyze a still image and return summary + entities."""
+    b64 = base64.standard_b64encode(image_bytes).decode("ascii")
+    athlete = athlete_name or "the athlete"
+    title = session_title or "training session"
+    media_type = mime_type if mime_type.startswith("image/") else "image/jpeg"
+    prompt = (
+        f"Analyze this {sport} training image for {athlete} (session: {title}). "
+        f"Context: {description or 'none'}. "
+        "Describe ONLY what is visible: activity, body position, equipment, environment, technique. "
+        "Respond as JSON: {\"summary\": \"...\", \"observations\": [\"...\"], \"entities\": [\"sport:...\"]}"
+    )
+    raw = _chat(
+        [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{b64}"}},
+                ],
+            }
+        ],
+        model=_vision_model(),
+        max_tokens=800,
+    )
+    return _parse_synthesis_json(raw, sport)
+
+
 def analyze_frame(
     jpeg_bytes: bytes,
     *,

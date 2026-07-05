@@ -19,6 +19,7 @@ from backend.app.core.security import (
     hash_otp,
     verify_internal_service_key,
 )
+from backend.app.core.access import ensure_canonical_athlete_id
 from backend.app.infrastructure.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -73,7 +74,11 @@ async def _get_athlete_id(db: AsyncSession, user_id: str) -> str | None:
 
 
 async def _user_response(db: AsyncSession, user_id: str, email: str, role: str, full_name: str | None) -> UserResponse:
-    athlete_id = await _get_athlete_id(db, user_id) if role == "athlete" else None
+    athlete_id = None
+    if role == "athlete":
+        athlete_id = await ensure_canonical_athlete_id(db, user_id)
+        if athlete_id:
+            await db.commit()
     return UserResponse(
         id=user_id,
         email=email,

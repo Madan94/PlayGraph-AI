@@ -18,6 +18,123 @@ async def get_athlete_id_for_user(db: AsyncSession, user: CurrentUser) -> str | 
     return str(result.id) if result else None
 
 
+async def ensure_canonical_athlete_id(db: AsyncSession, user_id: str) -> str | None:
+    """Return the athlete profile for this user, merging with coach roster if needed."""
+    row = await db.execute(
+        text("SELECT id FROM athletes WHERE user_id = CAST(:uid AS uuid) LIMIT 1"),
+        {"uid": user_id},
+    )
+    own = row.first()
+    if not own:
+        return None
+
+    own_id = str(own.id)
+    roster_row = await db.execute(
+        text("""
+            SELECT a.id
+            FROM athletes a
+            JOIN coach_athlete ca ON ca.athlete_id = a.id
+            WHERE ca.coach_id IN (
+                SELECT coach_id FROM coach_athlete
+                WHERE athlete_id = CAST(:own_id AS uuid)
+            )
+              AND a.user_id IS NULL
+              AND a.id != CAST(:own_id AS uuid)
+            ORDER BY (
+                SELECT COUNT(*) FROM sessions s WHERE s.athlete_id = a.id
+            ) DESC, a.created_at DESC
+            LIMIT 1
+        """),
+        {"own_id": own_id},
+    )
+    roster = roster_row.first()
+    if not roster:
+        return own_id
+
+    return await _merge_athlete_profiles(db, user_id, own_id, str(roster.id))
+
+
+async def claim_coach_roster_athlete(
+    db: AsyncSession,
+    user_id: str,
+    coach_id: str,
+    own_id: str | None,
+) -> str:
+    """Claim an unclaimed coach roster athlete so uploads and timeline share one ID."""
+    roster_row = await db.execute(
+        text("""
+            SELECT a.id
+            FROM athletes a
+            JOIN coach_athlete ca ON ca.athlete_id = a.id
+            WHERE ca.coach_id = CAST(:coach_id AS uuid)
+              AND a.user_id IS NULL
+            ORDER BY (
+                SELECT COUNT(*) FROM sessions s WHERE s.athlete_id = a.id
+            ) DESC, a.created_at DESC
+            LIMIT 1
+        """),
+        {"coach_id": coach_id},
+    )
+    roster = roster_row.first()
+    if roster:
+        roster_id = str(roster.id)
+        if own_id and own_id != roster_id:
+            return await _merge_athlete_profiles(db, user_id, own_id, roster_id)
+        await db.execute(
+            text("""
+                UPDATE athletes SET user_id = CAST(:uid AS uuid)
+                WHERE id = CAST(:rid AS uuid) AND user_id IS NULL
+            """),
+            {"uid": user_id, "rid": roster_id},
+        )
+        return roster_id
+
+    if own_id:
+        return own_id
+    raise HTTPException(status_code=400, detail="Complete athlete profile first")
+
+
+async def _merge_athlete_profiles(
+    db: AsyncSession,
+    user_id: str,
+    duplicate_id: str,
+    canonical_id: str,
+) -> str:
+    if duplicate_id == canonical_id:
+        return canonical_id
+
+    await db.execute(
+        text("""
+            UPDATE athletes SET user_id = CAST(:uid AS uuid)
+            WHERE id = CAST(:rid AS uuid) AND user_id IS NULL
+        """),
+        {"uid": user_id, "rid": canonical_id},
+    )
+    await db.execute(
+        text("""
+            UPDATE sessions SET athlete_id = CAST(:canonical AS uuid)
+            WHERE athlete_id = CAST(:duplicate AS uuid)
+        """),
+        {"canonical": canonical_id, "duplicate": duplicate_id},
+    )
+    await db.execute(
+        text("""
+            UPDATE memory_operations_log SET athlete_id = CAST(:canonical AS uuid)
+            WHERE athlete_id = CAST(:duplicate AS uuid)
+        """),
+        {"canonical": canonical_id, "duplicate": duplicate_id},
+    )
+    await db.execute(
+        text("DELETE FROM coach_athlete WHERE athlete_id = CAST(:duplicate AS uuid)"),
+        {"duplicate": duplicate_id},
+    )
+    await db.execute(
+        text("DELETE FROM athletes WHERE id = CAST(:duplicate AS uuid)"),
+        {"duplicate": duplicate_id},
+    )
+    return canonical_id
+
+
 async def assert_athlete_access(db: AsyncSession, user: CurrentUser, athlete_id: str) -> None:
     if user.role == "athlete":
         own = await get_athlete_id_for_user(db, user)

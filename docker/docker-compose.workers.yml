@@ -1,11 +1,40 @@
-# Workers + infra only (backend runs on host).
-# Cognee: set COGNEE_MODE=cloud in repo .env — workers POST to backend only (no local Cognee volumes).
+# Workers + infra. Backend runs on the host (hybrid dev).
+# Cognee Cloud: workers POST to backend /memory/ingest — no local Cognee volumes.
 #
 # Usage:
 #   cd docker
 #   docker compose -f docker-compose.workers.yml up -d --build
 #
-# Ensure host .env has KAFKA_BOOTSTRAP_SERVERS=localhost:9092 for local backend.
+# Host .env must have:
+#   KAFKA_BOOTSTRAP_SERVERS=localhost:9092   (for host backend)
+#   AUTH_INTERNAL_SERVICE_KEY=...              (same as frontend)
+# Stop local `python -m workers.main` processes before starting Docker workers.
+
+x-worker-env: &worker-env
+  KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_BUCKET: nextplay-assets
+  MINIO_SECURE: "false"
+  ENABLE_BACKEND_ACCESS_CONTROL: "false"
+  COGNEE_MODE: cloud
+  PLAYGRAPH_API_URL: http://host.docker.internal:8002
+
+x-worker-base: &worker-base
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile.worker
+  env_file:
+    - ../.env
+  restart: unless-stopped
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    redpanda:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
 
 services:
   postgres:
@@ -64,50 +93,28 @@ services:
       retries: 5
 
   json-worker:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.worker
-    env_file:
-      - ../.env
+    <<: *worker-base
     environment:
+      <<: *worker-env
       WORKER_TYPE: json
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: nextplay-assets
-      MINIO_SECURE: "false"
-      ENABLE_BACKEND_ACCESS_CONTROL: "false"
-      PLAYGRAPH_API_URL: http://host.docker.internal:8002
-    restart: unless-stopped
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
 
   video-worker:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.worker
-    env_file:
-      - ../.env
+    <<: *worker-base
     environment:
+      <<: *worker-env
       WORKER_TYPE: video
-      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: nextplay-assets
-      MINIO_SECURE: "false"
-      ENABLE_BACKEND_ACCESS_CONTROL: "false"
-      PLAYGRAPH_API_URL: http://host.docker.internal:8002
-    restart: unless-stopped
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
+
+  image-worker:
+    <<: *worker-base
+    environment:
+      <<: *worker-env
+      WORKER_TYPE: image
+
+  audio-worker:
+    <<: *worker-base
+    environment:
+      <<: *worker-env
+      WORKER_TYPE: audio
 
 volumes:
   postgres_data:

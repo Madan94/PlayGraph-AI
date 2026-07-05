@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.core.access import claim_coach_roster_athlete
 from backend.app.core.security import CurrentUser, require_role
 from backend.app.infrastructure.database import get_db
 
@@ -86,15 +87,13 @@ async def redeem_invite(
     user: CurrentUser = AthleteUser,
     db: AsyncSession = Depends(get_db),
 ):
-    athlete_row = await db.execute(
+    own_row = await db.execute(
         text("SELECT id FROM athletes WHERE user_id = CAST(:uid AS uuid) LIMIT 1"),
         {"uid": user.id},
     )
-    athlete = athlete_row.first()
-    if not athlete:
-        raise HTTPException(status_code=400, detail="Complete athlete profile first")
+    own = own_row.first()
+    own_id = str(own.id) if own else None
 
-    athlete_id = str(athlete.id)
     code = body.code.strip().upper()
 
     invite_row = await db.execute(
@@ -115,27 +114,29 @@ async def redeem_invite(
     if invite.uses >= invite.max_uses:
         raise HTTPException(status_code=400, detail="Invite code has no uses remaining")
 
+    coach_id = str(invite.coach_id)
+    athlete_id = await claim_coach_roster_athlete(db, user.id, coach_id, own_id)
+
     existing = await db.execute(
         text("""
             SELECT 1 FROM coach_athlete
             WHERE coach_id = :coach_id AND athlete_id = CAST(:athlete_id AS uuid)
         """),
-        {"coach_id": str(invite.coach_id), "athlete_id": athlete_id},
+        {"coach_id": coach_id, "athlete_id": athlete_id},
     )
-    if existing.first():
-        return {"ok": True, "message": "Already linked to this coach"}
+    if not existing.first():
+        await db.execute(
+            text("""
+                INSERT INTO coach_athlete (coach_id, athlete_id)
+                VALUES (CAST(:coach_id AS uuid), CAST(:athlete_id AS uuid))
+                ON CONFLICT DO NOTHING
+            """),
+            {"coach_id": coach_id, "athlete_id": athlete_id},
+        )
 
-    await db.execute(
-        text("""
-            INSERT INTO coach_athlete (coach_id, athlete_id)
-            VALUES (CAST(:coach_id AS uuid), CAST(:athlete_id AS uuid))
-            ON CONFLICT DO NOTHING
-        """),
-        {"coach_id": str(invite.coach_id), "athlete_id": athlete_id},
-    )
     await db.execute(
         text("UPDATE coach_invites SET uses = uses + 1 WHERE id = :id"),
         {"id": str(invite.id)},
     )
     await db.commit()
-    return {"ok": True, "coach_id": str(invite.coach_id)}
+    return {"ok": True, "coach_id": coach_id, "athlete_id": athlete_id}

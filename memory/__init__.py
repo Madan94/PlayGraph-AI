@@ -1,23 +1,19 @@
 """NextPlayAI Memory Layer — Cognee is the brain."""
 
-from memory.cognee_client import CogneeMemoryClient
-from memory.lifecycle import MemoryLifecycleService
 from memory.schemas import (
     ForgetPolicy,
+    LifecycleEvent,
     MemoryPayload,
     MemoryRef,
     RecallQuery,
     RecallResult,
-    LifecycleEvent,
 )
 
 __all__ = [
-    "CogneeMemoryClient",
-    "MemoryLifecycleService",
+    "ForgetPolicy",
+    "LifecycleEvent",
     "MemoryPayload",
     "MemoryRef",
     "RecallQuery",
     "RecallResult",
-    "ForgetPolicy",
-    "LifecycleEvent",
 ]

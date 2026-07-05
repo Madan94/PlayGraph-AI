@@ -29,6 +29,16 @@ logger = logging.getLogger(__name__)
 LifecycleCallback = Callable[[LifecycleEvent], Awaitable[None]]
 
 
+def _is_empty_dataset_recall_error(exc: BaseException) -> bool:
+    """Cognee Cloud returns 404 when a dataset has not been remembered/cognified yet."""
+    message = str(exc).lower()
+    return (
+        "recall prerequisites not met" in message
+        or "remote recall failed (404)" in message
+        or ("404" in message and "recall" in message)
+    )
+
+
 def _recall_item_to_text(item: object) -> str:
     """Extract human-readable text from Cognee 1.x recall result items."""
     if item is None:
@@ -192,8 +202,20 @@ class CogneeMemoryClient:
         if not query.athlete_id:
             logger.warning("recall() without athlete_id — using base dataset only")
         ds = self._resolve_dataset(query.athlete_id)
-        async with cognee_exclusive(write=False):
-            raw = await cognee.recall(search_text, top_k=query.limit, datasets=[ds])
+        raw = None
+        try:
+            async with cognee_exclusive(write=False):
+                raw = await cognee.recall(search_text, top_k=query.limit, datasets=[ds])
+        except Exception as exc:
+            if _is_empty_dataset_recall_error(exc):
+                logger.info(
+                    "recall() empty dataset for athlete=%s dataset=%s",
+                    query.athlete_id,
+                    ds,
+                )
+                raw = []
+            else:
+                raise
 
         sources: list[RecallSource] = []
         if isinstance(raw, list):
