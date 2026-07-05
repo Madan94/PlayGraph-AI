@@ -1,5 +1,5 @@
 # Workers + infra only (backend runs on host).
-# Shares Cognee data with host via bind mounts — set COGNEE_HOST paths in repo .env or below.
+# Cognee: set COGNEE_MODE=cloud in repo .env — workers POST to backend only (no local Cognee volumes).
 #
 # Usage:
 #   cd docker
@@ -77,12 +77,8 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: nextplay-assets
       MINIO_SECURE: "false"
-      DATA_ROOT_DIRECTORY: /app/.cognee_data
-      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
       ENABLE_BACKEND_ACCESS_CONTROL: "false"
-    volumes:
-      - ${COGNEE_DATA_HOST:-../.cognee_data}:/app/.cognee_data
-      - ${COGNEE_SYSTEM_HOST:-../.cognee_system}:/app/.cognee_system
+      PLAYGRAPH_API_URL: http://host.docker.internal:8002
     restart: unless-stopped
     depends_on:
       redpanda:
@@ -104,12 +100,8 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: nextplay-assets
       MINIO_SECURE: "false"
-      DATA_ROOT_DIRECTORY: /app/.cognee_data
-      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
       ENABLE_BACKEND_ACCESS_CONTROL: "false"
-    volumes:
-      - ${COGNEE_DATA_HOST:-../.cognee_data}:/app/.cognee_data
-      - ${COGNEE_SYSTEM_HOST:-../.cognee_system}:/app/.cognee_system
+      PLAYGRAPH_API_URL: http://host.docker.internal:8002
     restart: unless-stopped
     depends_on:
       redpanda:

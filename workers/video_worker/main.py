@@ -1,4 +1,4 @@
-"""Video worker — sport-agnostic vision analysis → remember()."""
+"""Video worker — sport-agnostic vision analysis → backend memory ingest."""
 
 from __future__ import annotations
 
@@ -15,9 +15,8 @@ load_project_env()
 
 from aiokafka import AIOKafkaConsumer
 
+from memory.ingest_client import ingest_via_backend
 from memory.schemas import MemoryContent, MemoryEvidence, MemoryPayload, MemoryType
-from memory.lifecycle import MemoryLifecycleService
-from memory.cognee_client import CogneeMemoryClient
 from workers.shared.video_analyzer import VideoSessionContext, analyze_video
 
 logging.basicConfig(level=logging.INFO)
@@ -48,9 +47,6 @@ async def process_video(session_id: str, asset_id: str, minio_key: str, context:
         raise ValueError("minio_key is required for video processing")
     if not athlete_id:
         raise ValueError("athlete_id is required for video processing")
-
-    client = CogneeMemoryClient(dataset=os.getenv("COGNEE_DATASET", "nextplay_ai"))
-    lifecycle = MemoryLifecycleService(client)
 
     video_path = await asyncio.to_thread(_download_from_minio, minio_key)
     try:
@@ -86,8 +82,8 @@ async def process_video(session_id: str, asset_id: str, minio_key: str, context:
         ),
         evidence=MemoryEvidence(asset_id=asset_id),
     )
-    await lifecycle.ingest_worker_output(payload)
-    logger.info("Video worker → remember() for session %s (%s)", session_id, session_ctx.sport)
+    await ingest_via_backend(payload)
+    logger.info("Video worker → ingest for session %s (%s)", session_id, session_ctx.sport)
 
 
 async def main() -> None:

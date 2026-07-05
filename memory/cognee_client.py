@@ -6,6 +6,10 @@ import os
 import time
 from typing import Callable, Awaitable
 
+from memory.env_loader import load_project_env
+
+load_project_env(override=True)
+
 import cognee
 
 from memory.cognee_session import cognee_exclusive
@@ -91,8 +95,18 @@ class CogneeMemoryClient:
         text = payload.to_remember_text()
 
         ds = self.athlete_dataset(payload.athlete_id)
-        async with cognee_exclusive():
-            await cognee.remember(text, dataset_name=ds)
+        logger.info(
+            "Cognee remember() starting for dataset=%s session=%s (graph+LLM phase, often 1-3 min)",
+            ds,
+            payload.session_id,
+        )
+        async with cognee_exclusive(write=True):
+            await cognee.remember(text, dataset_name=ds, self_improvement=False)
+        logger.info(
+            "Cognee remember() finished for dataset=%s session=%s",
+            ds,
+            payload.session_id,
+        )
 
         self._memory_count += 1
         ref = MemoryRef(
@@ -121,14 +135,23 @@ class CogneeMemoryClient:
         return ref
 
     async def remember_and_improve(self, payload: MemoryPayload) -> MemoryRef:
-        """Store memory and run improve under a single Cognee lock (for workers)."""
+        """Store worker memory under a single write lock (improve runs on demand later)."""
         start = time.perf_counter()
         text = payload.to_remember_text()
         ds = self.athlete_dataset(payload.athlete_id)
+        logger.info(
+            "Cognee remember() starting for dataset=%s session=%s (graph+LLM phase, often 1-3 min)",
+            ds,
+            payload.session_id,
+        )
 
-        async with cognee_exclusive():
-            await cognee.remember(text, dataset_name=ds)
-            await cognee.improve(dataset=ds)
+        async with cognee_exclusive(write=True):
+            await cognee.remember(text, dataset_name=ds, self_improvement=False)
+        logger.info(
+            "Cognee remember() finished for dataset=%s session=%s",
+            ds,
+            payload.session_id,
+        )
 
         self._memory_count += 1
         ref = MemoryRef(
@@ -154,13 +177,8 @@ class CogneeMemoryClient:
             delta=1,
         ))
         await self._emit(LifecycleEvent(
-            op=LifecycleOperation.IMPROVE,
-            message="Merged and enriched athlete memories",
-            athlete_id=payload.athlete_id,
-        ))
-        await self._emit(LifecycleEvent(
             op=LifecycleOperation.GRAPH_UPDATED,
-            message="Knowledge graph updated after remember_and_improve()",
+            message="Knowledge graph updated after worker remember()",
             athlete_id=payload.athlete_id,
         ))
         return ref
@@ -174,7 +192,7 @@ class CogneeMemoryClient:
         if not query.athlete_id:
             logger.warning("recall() without athlete_id — using base dataset only")
         ds = self._resolve_dataset(query.athlete_id)
-        async with cognee_exclusive():
+        async with cognee_exclusive(write=False):
             raw = await cognee.recall(search_text, top_k=query.limit, datasets=[ds])
 
         sources: list[RecallSource] = []
@@ -212,7 +230,7 @@ class CogneeMemoryClient:
     async def improve(self, athlete_id: str | None = None) -> None:
         start = time.perf_counter()
         ds = self._resolve_dataset(athlete_id)
-        async with cognee_exclusive():
+        async with cognee_exclusive(write=True):
             await cognee.improve(dataset=ds)
         latency_ms = int((time.perf_counter() - start) * 1000)
         logger.info("improve() completed (%dms)", latency_ms)
@@ -231,7 +249,7 @@ class CogneeMemoryClient:
     async def forget(self, policy: ForgetPolicy) -> None:
         start = time.perf_counter()
         # Cognee forget operates at dataset level; scoped policies are applied upstream
-        async with cognee_exclusive():
+        async with cognee_exclusive(write=True):
             if policy.athlete_id:
                 await cognee.forget(dataset=self.athlete_dataset(policy.athlete_id))
                 logger.info("forget() cleared dataset for athlete=%s", policy.athlete_id)

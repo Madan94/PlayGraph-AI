@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.core.access import assert_athlete_access
+from backend.app.core.security import CurrentUser, get_current_user
 from backend.app.infrastructure.database import get_db
 from backend.app.infrastructure.minio_client import upload_file
 
@@ -23,7 +24,12 @@ class CreateSessionRequest(BaseModel):
 
 
 @router.post("")
-async def create_session(body: CreateSessionRequest, db: AsyncSession = Depends(get_db)):
+async def create_session(
+    body: CreateSessionRequest,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await assert_athlete_access(db, user, body.athlete_id)
     session_id = str(uuid.uuid4())
     await db.execute(
         text("""
@@ -46,13 +52,28 @@ async def create_session(body: CreateSessionRequest, db: AsyncSession = Depends(
     return {"id": session_id, "status": "pending", "athlete_id": body.athlete_id}
 
 
+async def _get_session_athlete_id(db: AsyncSession, session_id: str) -> str:
+    session_row = await db.execute(
+        text("SELECT athlete_id FROM sessions WHERE id = CAST(:id AS uuid)"),
+        {"id": session_id},
+    )
+    session = session_row.first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return str(session.athlete_id)
+
+
 @router.post("/{session_id}/assets")
 async def upload_asset(
     session_id: str,
     asset_type: str = Form(...),
     file: UploadFile = File(...),
+    user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    athlete_id = await _get_session_athlete_id(db, session_id)
+    await assert_athlete_access(db, user, athlete_id)
+
     session_row = await db.execute(
         text("""
             SELECT s.athlete_id, s.sport, s.title, s.description, a.name AS athlete_name
@@ -66,7 +87,6 @@ async def upload_asset(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    athlete_id = str(session.athlete_id)
     content = await file.read()
     original_filename = file.filename or "upload"
     key = f"sessions/{session_id}/{uuid.uuid4()}_{original_filename}"
@@ -125,7 +145,14 @@ async def upload_asset(
 
 
 @router.get("/{session_id}")
-async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
+async def get_session(
+    session_id: str,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    athlete_id = await _get_session_athlete_id(db, session_id)
+    await assert_athlete_access(db, user, athlete_id)
+
     result = await db.execute(
         text("""
             SELECT id, athlete_id, title, type, sport, description, status, started_at

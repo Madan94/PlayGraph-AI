@@ -8,63 +8,52 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.core.access import assert_athlete_access, list_accessible_athlete_ids
+from backend.app.core.security import CurrentUser, get_current_user, require_role
 from backend.app.infrastructure.database import get_db
 
 router = APIRouter(prefix="/athletes", tags=["athletes"])
+
+CoachUser = Depends(require_role("coach"))
 
 
 class CreateAthleteRequest(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     sport: str = Field(default="athletics", max_length=64)
     metadata: dict = Field(default_factory=dict)
-    user_id: str | None = None
 
 
 @router.post("", status_code=201)
-async def create_athlete(body: CreateAthleteRequest, db: AsyncSession = Depends(get_db)):
+async def create_athlete(
+    body: CreateAthleteRequest,
+    user: CurrentUser = CoachUser,
+    db: AsyncSession = Depends(get_db),
+):
     athlete_id = str(uuid.uuid4())
-    if body.user_id:
-        user_row = await db.execute(
-            text("SELECT id FROM users WHERE id = CAST(:user_id AS uuid)"),
-            {"user_id": body.user_id},
-        )
-        if not user_row.first():
-            raise HTTPException(status_code=404, detail="Linked user not found")
-
-    params = {
-        "id": athlete_id,
-        "name": body.name.strip(),
-        "sport": body.sport.strip(),
-        "metadata": json.dumps(body.metadata),
-    }
-
-    if body.user_id:
-        await db.execute(
-            text("""
-                INSERT INTO athletes (id, user_id, name, sport, metadata)
-                VALUES (
-                    CAST(:id AS uuid),
-                    CAST(:user_id AS uuid),
-                    :name,
-                    :sport,
-                    CAST(:metadata AS jsonb)
-                )
-            """),
-            {**params, "user_id": body.user_id},
-        )
-    else:
-        await db.execute(
-            text("""
-                INSERT INTO athletes (id, name, sport, metadata)
-                VALUES (
-                    CAST(:id AS uuid),
-                    :name,
-                    :sport,
-                    CAST(:metadata AS jsonb)
-                )
-            """),
-            params,
-        )
+    await db.execute(
+        text("""
+            INSERT INTO athletes (id, name, sport, metadata)
+            VALUES (
+                CAST(:id AS uuid),
+                :name,
+                :sport,
+                CAST(:metadata AS jsonb)
+            )
+        """),
+        {
+            "id": athlete_id,
+            "name": body.name.strip(),
+            "sport": body.sport.strip(),
+            "metadata": json.dumps(body.metadata),
+        },
+    )
+    await db.execute(
+        text("""
+            INSERT INTO coach_athlete (coach_id, athlete_id)
+            VALUES (CAST(:coach_id AS uuid), CAST(:athlete_id AS uuid))
+        """),
+        {"coach_id": user.id, "athlete_id": athlete_id},
+    )
     await db.commit()
     return {
         "id": athlete_id,
@@ -75,14 +64,33 @@ async def create_athlete(body: CreateAthleteRequest, db: AsyncSession = Depends(
 
 
 @router.get("")
-async def list_athletes(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        text("""
+async def list_athletes(
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    allowed = await list_accessible_athlete_ids(db, user)
+    if allowed is None:
+        query = text("""
             SELECT id, name, sport, metadata
             FROM athletes
             ORDER BY name
         """)
-    )
+        result = await db.execute(query)
+    elif not allowed:
+        return {"athletes": []}
+    else:
+        placeholders = ", ".join(f":id{i}" for i in range(len(allowed)))
+        params = {f"id{i}": aid for i, aid in enumerate(allowed)}
+        result = await db.execute(
+            text(f"""
+                SELECT id, name, sport, metadata
+                FROM athletes
+                WHERE id::text IN ({placeholders})
+                ORDER BY name
+            """),
+            params,
+        )
+
     return {
         "athletes": [
             {
@@ -97,7 +105,12 @@ async def list_athletes(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{athlete_id}")
-async def get_athlete(athlete_id: str, db: AsyncSession = Depends(get_db)):
+async def get_athlete(
+    athlete_id: str,
+    user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await assert_athlete_access(db, user, athlete_id)
     result = await db.execute(
         text("""
             SELECT id, name, sport, metadata

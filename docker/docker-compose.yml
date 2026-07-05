@@ -1,3 +1,6 @@
+# Full stack. Cognee: set COGNEE_MODE=cloud in ../.env for managed memory (no local Cognee volumes).
+# For embedded mode, uncomment cognee_data/cognee_system volumes on backend and set DATA_ROOT_* in .env.
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -66,11 +69,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://nextplay:nextplay@postgres:5432/nextplay
       MINIO_ENDPOINT: minio:9000
       KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
-      DATA_ROOT_DIRECTORY: /app/.cognee_data
-      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
     volumes:
-      - cognee_data:/app/.cognee_data
-      - cognee_system:/app/.cognee_system
       - ../memory:/app/memory
       - ../backend:/app/backend
     depends_on:
@@ -95,12 +94,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: nextplay-assets
       MINIO_SECURE: "false"
-      DATA_ROOT_DIRECTORY: /app/.cognee_data
-      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
       ENABLE_BACKEND_ACCESS_CONTROL: "false"
-    volumes:
-      - ../.cognee_data:/app/.cognee_data
-      - ../.cognee_system:/app/.cognee_system
     restart: unless-stopped
     depends_on:
       redpanda:
@@ -122,12 +116,7 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: nextplay-assets
       MINIO_SECURE: "false"
-      DATA_ROOT_DIRECTORY: /app/.cognee_data
-      SYSTEM_ROOT_DIRECTORY: /app/.cognee_system
       ENABLE_BACKEND_ACCESS_CONTROL: "false"
-    volumes:
-      - ../.cognee_data:/app/.cognee_data
-      - ../.cognee_system:/app/.cognee_system
     restart: unless-stopped
     depends_on:
       redpanda:
@@ -138,5 +127,3 @@ services:
 volumes:
   postgres_data:
   minio_data:
-  cognee_data:
-  cognee_system:

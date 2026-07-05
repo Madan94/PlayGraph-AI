@@ -1,4 +1,4 @@
-"""Serialize Cognee/Ladybug access across PlayGraph backend and workers."""
+"""Serialize Cognee/Ladybug access within the PlayGraph backend process."""
 
 from __future__ import annotations
 
@@ -6,25 +6,24 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from pathlib import Path
 
-from filelock import FileLock, Timeout as FileLockTimeout
+from memory.env_loader import load_project_env
 
-from memory.env_loader import REPO_ROOT
+load_project_env()
+
+from memory.cognee_connection import is_cognee_cloud
 
 logger = logging.getLogger(__name__)
 
-_LOCK_TIMEOUT = float(os.getenv("COGNEE_LOCK_TIMEOUT_SECONDS", "180"))
+_READ_LOCK_TIMEOUT = float(os.getenv("COGNEE_READ_LOCK_TIMEOUT_SECONDS", "120"))
+_WRITE_LOCK_TIMEOUT = float(os.getenv("COGNEE_WRITE_LOCK_TIMEOUT_SECONDS", "600"))
+_TEARDOWN_TIMEOUT = float(os.getenv("COGNEE_TEARDOWN_TIMEOUT_SECONDS", "30"))
+
+_process_lock = asyncio.Lock()
 
 
 class CogneeLockTimeoutError(TimeoutError):
-    """Raised when another process holds the shared Cognee file lock too long."""
-
-
-def _lock_path() -> Path:
-    system_root = Path(os.getenv("SYSTEM_ROOT_DIRECTORY", REPO_ROOT / ".cognee_system"))
-    system_root.mkdir(parents=True, exist_ok=True)
-    return system_root / ".playgraph_cognee.lock"
+    """Raised when Cognee is busy with another memory operation."""
 
 
 async def _close_cached_engine(engine) -> None:
@@ -74,26 +73,38 @@ async def release_cognee_engines() -> None:
 
 
 @asynccontextmanager
-async def cognee_exclusive():
+async def cognee_exclusive(*, write: bool = False):
     """
-    Exclusive access to the local Cognee graph DB.
+    Exclusive access to Cognee inside the backend process (embedded mode only).
 
-    Ladybug allows only one process to open ``cognee_graph_ladybug`` at a time.
-    Backend, workers, and Cognee CLI share the same paths on disk — this lock
-    serializes them and releases engines when each operation finishes.
+    Workers must use ``memory.ingest_client`` (HTTP) instead of calling Cognee
+    directly — Ladybug does not support multi-process access on Windows.
+
+    In cloud mode this is a no-op; Cognee Cloud handles concurrency remotely.
     """
-    lock = FileLock(str(_lock_path()))
-    acquired = False
-    try:
-        await asyncio.to_thread(lock.acquire, timeout=_LOCK_TIMEOUT)
-        acquired = True
+    if is_cognee_cloud():
         yield
-    except FileLockTimeout as exc:
+        return
+
+    timeout = _WRITE_LOCK_TIMEOUT if write else _READ_LOCK_TIMEOUT
+    try:
+        await asyncio.wait_for(_process_lock.acquire(), timeout=timeout)
+    except asyncio.TimeoutError as exc:
         raise CogneeLockTimeoutError(
-            f"Timed out waiting for Cognee lock ({_LOCK_TIMEOUT}s). "
-            "Another PlayGraph worker may be ingesting a video, or Cognee CLI is open."
+            f"Timed out waiting for Cognee ({timeout}s). "
+            "Memory ingest or recall is still running — try again shortly."
         ) from exc
+
+    try:
+        yield
     finally:
-        if acquired:
-            await release_cognee_engines()
-            await asyncio.to_thread(lock.release)
+        try:
+            await asyncio.wait_for(release_cognee_engines(), timeout=_TEARDOWN_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Cognee engine teardown exceeded %ss",
+                _TEARDOWN_TIMEOUT,
+            )
+        except Exception:
+            logger.warning("Cognee engine teardown failed", exc_info=True)
+        _process_lock.release()

@@ -3,15 +3,136 @@
 @tailwind utilities;
 
 @layer base {
+  html,
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-white font-sans text-black antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply tracking-tight text-black;
+  }
+}
+
+@layer components {
+  .page-shell {
+    @apply relative min-h-screen bg-white;
+  }
+
+  .page-shell::before,
+  .page-shell::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: min(320px, 28vw);
+    pointer-events: none;
+    z-index: 0;
+    background-image: radial-gradient(
+      circle,
+      rgba(0, 102, 255, 0.1) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  .page-shell::before {
+    left: 15rem;
+    mask-image: linear-gradient(to right, black 0%, transparent 100%);
+  }
+
+  .page-shell::after {
+    right: 0;
+    mask-image: linear-gradient(to left, black 0%, transparent 100%);
+  }
+
+  .page-content {
+    @apply relative z-10;
+  }
+
+  .page-title {
+    @apply text-4xl font-semibold tracking-tight text-black;
+  }
+
+  .page-subtitle {
+    @apply mt-2 max-w-2xl text-base leading-relaxed text-muted;
+  }
+
+  .section-title {
+    @apply text-xl font-semibold tracking-tight text-black;
+  }
+
+  .section-subtitle {
+    @apply mt-1 text-sm text-muted;
+  }
+
+  .card {
+    @apply rounded-2xl border border-gray-100 bg-white shadow-card;
+  }
+
+  .card-padded {
+    @apply card p-6;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-gray-50;
+  }
+
+  .input-field {
+    @apply w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-black outline-none transition placeholder:text-gray-400 focus:border-brand focus:ring-2 focus:ring-brand/10;
+  }
+
+  .icon-badge {
+    @apply mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-light text-brand;
+  }
+
+  .icon-badge svg {
+    @apply h-6 w-6;
+  }
+
+  .badge-brand {
+    @apply rounded-full bg-brand-light px-3 py-1 text-xs font-semibold text-brand;
+  }
+
+  .badge-new {
+    @apply inline-flex items-center rounded-full bg-brand-light px-2.5 py-0.5 text-xs font-medium text-brand;
+  }
+
+  .field-label {
+    @apply mb-2 flex items-center gap-2 text-sm font-medium text-black;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted transition-colors hover:bg-gray-50 hover:text-black;
+  }
+
+  .nav-link-active {
+    @apply bg-brand-light text-brand hover:bg-brand-light hover:text-brand;
+  }
+
+  .surface-muted {
+    @apply rounded-xl border border-gray-100 bg-gray-50;
+  }
+
+  .alert-error {
+    @apply rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700;
+  }
+
+  .alert-success {
+    @apply rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800;
   }
 }
 
 .glass {
-  @apply bg-white/[0.05] backdrop-blur-xl border border-white/10;
+  @apply rounded-2xl border border-gray-100 bg-white shadow-card;
 }
 
 .gradient-text {
-  @apply bg-gradient-to-r from-purple via-purple-light to-cyan bg-clip-text text-transparent;
+  @apply bg-gradient-to-r from-brand to-cyan bg-clip-text text-transparent;
 }
