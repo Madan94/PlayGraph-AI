@@ -95,8 +95,8 @@ export function LiveMemoryPanel({ embedded = false }: { embedded?: boolean }) {
   return (
     <div
       className={cn(
-        "flex h-full min-h-[620px] flex-col overflow-hidden bg-white",
-        !embedded && "card"
+        "flex h-full flex-col overflow-hidden bg-white",
+        embedded ? "min-h-0" : "card min-h-[620px]"
       )}
     >
       <div className="flex items-center gap-4 border-b border-gray-100 px-6 py-5">

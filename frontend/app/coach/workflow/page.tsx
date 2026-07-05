@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 
 export default function WorkflowPage() {
   return (
-    <div className="mx-auto flex h-screen max-w-7xl flex-col p-8 lg:p-10">
+    <div className="app-page-xl flex min-h-0 flex-1 flex-col gap-6">
       <PageHeader
         icon={GitBranch}
         title="Memory Pipeline"
@@ -20,12 +20,12 @@ export default function WorkflowPage() {
               Interactive visualization of the end-to-end memory pipeline.
             </p>
           </div>
-          <div className="h-[calc(100%-88px)]">
+          <div className="h-[min(560px,70vh)] min-h-[400px]">
             <WorkflowCanvas />
           </div>
         </section>
 
-        <section className="hidden min-h-0 lg:block">
+        <section className="card min-h-[480px] overflow-hidden lg:min-h-0">
           <LiveMemoryPanel embedded />
         </section>
       </div>

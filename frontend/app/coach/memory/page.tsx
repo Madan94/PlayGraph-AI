@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 
 export default function MemoryPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-8 p-8 lg:p-10">
+    <div className="app-page-xl space-y-8">
       <PageHeader
         icon={Brain}
         title="Memory"
@@ -17,8 +17,8 @@ export default function MemoryPage() {
 
       <section className="card-padded">
         <div className="mb-6">
-          <h2 className="section-title">Memory Timeline</h2>
-          <p className="section-subtitle">Chronological view of stored athlete memories</p>
+          <h2 className="section-title">Memory Operations</h2>
+          <p className="section-subtitle">Cognee remember / recall / improve counts for your dataset</p>
         </div>
         <MemoryTimeline embedded />
       </section>

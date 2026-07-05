@@ -18,34 +18,39 @@ export function AthleteSidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="relative z-20 flex h-screen w-60 shrink-0 flex-col border-r border-gray-100 bg-white">
-      <div className="flex h-16 items-center gap-3 border-b border-gray-100 px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-black">
+    <aside className="app-sidebar" aria-label="Athlete navigation">
+      <div className="app-sidebar-header">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-black">
           <Zap className="h-4 w-4 text-white" />
         </div>
-        <div>
-          <h2 className="text-sm font-semibold text-black">PlayGraphAI</h2>
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold text-black">PlayGraphAI</h2>
           <p className="text-xs text-muted">Athlete</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="app-sidebar-nav">
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
-            <Link key={href} href={href} className={cn("nav-link", active && "nav-link-active")}>
+            <Link
+              key={href}
+              href={href}
+              title={label}
+              className={cn("nav-link", active && "nav-link-active")}
+            >
               <Icon className="h-4 w-4 shrink-0" />
-              <span>{label}</span>
+              <span className="truncate">{label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-gray-100 p-4 space-y-2">
-        {user && <p className="truncate text-xs text-muted px-1">{user.email}</p>}
+      <div className="app-sidebar-footer">
+        {user && <p className="truncate px-1 text-xs text-muted">{user.email}</p>}
         <button type="button" onClick={() => logout()} className="nav-link w-full text-left">
-          <LogOut className="h-4 w-4" />
-          Log out
+          <LogOut className="h-4 w-4 shrink-0" />
+          <span>Log out</span>
         </button>
       </div>
     </aside>

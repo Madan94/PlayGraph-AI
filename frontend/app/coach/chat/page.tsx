@@ -3,11 +3,19 @@
 import { useEffect, useState } from "react";
 import { MessageSquare, Search, User, Sparkles, ArrowRight } from "lucide-react";
 
-import { athletesApi, chatApi, type Athlete } from "@/lib/api";
+import { chatApi } from "@/lib/api";
+import { useAthletes } from "@/lib/hooks/use-athletes";
+import { AthleteSelect } from "@/components/coach/athlete-select";
 import { PageHeader } from "@/components/ui/page-header";
 
-export default function ChatPage() {
-  const [athletes, setAthletes] = useState<Athlete[]>([]);
+const SUGGESTIONS = [
+  "How has batting performance changed over recent sessions?",
+  "Summarize the last training upload.",
+  "Any injury or fatigue signals in recent memories?",
+];
+
+export default function CoachChatPage() {
+  const { athletes, loading: athletesLoading, error: athletesError } = useAthletes();
   const [athleteId, setAthleteId] = useState("");
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<Awaited<ReturnType<typeof chatApi.ask>> | null>(null);
@@ -15,23 +23,27 @@ export default function ChatPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    athletesApi.list().then((data) => {
-      setAthletes(data.athletes);
-      if (data.athletes.length) setAthleteId(data.athletes[0].id);
-    });
-  }, []);
+    if (!athletes.length) {
+      setAthleteId("");
+      return;
+    }
+    if (!athleteId || !athletes.some((a) => a.id === athleteId)) {
+      setAthleteId(athletes[0].id);
+    }
+  }, [athletes, athleteId]);
 
   async function ask(question: string) {
     if (!athleteId) {
-      setError("Please select an athlete.");
+      setError("Select an athlete first.");
       return;
     }
+    if (!question.trim()) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await chatApi.ask(athleteId, question);
+      const response = await chatApi.ask(athleteId, question.trim());
       setResult(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to process request.");
@@ -42,55 +54,76 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-8 lg:p-10">
+    <div className="app-page-lg">
       <PageHeader
         icon={MessageSquare}
         title="Coach Chat"
-        description="Ask questions about an athlete's performance. Responses are grounded using Cognee memory through recall()."
+        description="Ask questions about an athlete's performance. Answers are grounded in Cognee recall()."
       />
 
       <section className="card-padded">
         <div className="mb-5">
-          <label className="field-label">
+          <label className="field-label" htmlFor="chat-athlete">
             <User className="h-4 w-4" />
             Athlete
           </label>
-          <select
+          <AthleteSelect
+            athletes={athletes}
             value={athleteId}
-            onChange={(e) => setAthleteId(e.target.value)}
-            className="input-field"
-          >
-            <option value="">Select an athlete...</option>
-            {athletes.map((athlete) => (
-              <option key={athlete.id} value={athlete.id}>
-                {athlete.name}
-              </option>
-            ))}
-          </select>
+            onChange={setAthleteId}
+            loading={athletesLoading}
+            error={athletesError}
+          />
         </div>
 
         <div className="mb-5">
-          <label className="field-label">
+          <label className="field-label" htmlFor="chat-question">
             <Search className="h-4 w-4" />
             Question
           </label>
           <textarea
+            id="chat-question"
             rows={4}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                ask(query);
+              }
+            }}
             placeholder="Example: How has the athlete's batting performance changed over the last five sessions?"
             className="input-field resize-none"
+            disabled={!athleteId || athletesLoading}
           />
+          <p className="mt-2 text-xs text-muted">Press Ctrl+Enter to send</p>
+        </div>
+
+        <div className="mb-5 flex flex-wrap gap-2">
+          {SUGGESTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                setQuery(s);
+                ask(s);
+              }}
+              disabled={loading || !athleteId}
+              className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-left text-xs text-muted transition hover:border-brand/30 hover:bg-brand-light hover:text-brand disabled:opacity-50"
+            >
+              {s}
+            </button>
+          ))}
         </div>
 
         <button
           type="button"
           onClick={() => ask(query)}
-          disabled={loading || !query.trim()}
+          disabled={loading || !query.trim() || !athleteId}
           className="btn-primary"
         >
           <Sparkles className="h-4 w-4" />
-          {loading ? "Thinking..." : "Ask Coach"}
+          {loading ? "Thinking…" : "Ask Coach"}
           {!loading && <ArrowRight className="h-4 w-4" />}
         </button>
 
@@ -99,10 +132,11 @@ export default function ChatPage() {
 
       {result && (
         <section className="card-padded">
-          <div className="mb-5 flex items-center justify-between">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <h2 className="section-title">AI Response</h2>
             <span className="badge-brand">
-              recall() • {result.recall.memories_used} memories
+              recall() • {result.recall.memories_used} memor
+              {result.recall.memories_used === 1 ? "y" : "ies"}
             </span>
           </div>
 
@@ -121,6 +155,12 @@ export default function ChatPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {result.recall.memories_used === 0 && (
+            <p className="mt-4 text-sm text-muted">
+              No memories matched this question. Upload a session for this athlete first.
+            </p>
           )}
         </section>
       )}

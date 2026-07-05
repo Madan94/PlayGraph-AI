@@ -7,7 +7,7 @@ import { invitesApi } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 export default function AthleteSettingsPage() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,8 @@ export default function AthleteSettingsPage() {
     setMessage(null);
     try {
       await invitesApi.redeem(code.trim());
-      setMessage("Successfully linked to your coach.");
+      await refresh();
+      setMessage("Successfully linked to your coach. Your timeline now uses your coach roster profile.");
       setCode("");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Invalid invite code");
@@ -28,7 +29,7 @@ export default function AthleteSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-8 lg:p-10">
+    <div className="app-page-sm">
       <PageHeader icon={Settings} title="Settings" description="Manage your athlete profile and coach connections." />
       <section className="card-padded space-y-6">
         <div>

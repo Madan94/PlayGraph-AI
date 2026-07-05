@@ -1,4 +1,5 @@
 import { API_URL } from "./utils";
+import { parseApiError } from "./parse-api-error";
 
 /** Browser calls same-origin BFF proxy; server components may use API_URL directly. */
 export const CLIENT_API_BASE = typeof window !== "undefined" ? "/api/v1" : `${API_URL}/api/v1`;
@@ -17,7 +18,7 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(err || res.statusText);
+    throw new Error(parseApiError(err, res.statusText));
   }
   return res.json();
 }
@@ -156,13 +157,21 @@ export async function downloadReport(athlete_id: string, session_id?: string) {
   URL.revokeObjectURL(url);
 }
 
-export async function createSessionAndUpload(
-  athleteId: string,
-  sport: string,
-  description: string,
-  file: File
-) {
-  const session = await api<{ id: string }>("/sessions", {
+export type AssetType = "video" | "image" | "audio" | "json";
+
+export type UploadTab = "video" | "images" | "audio" | "json" | "notes";
+
+export function inferAssetType(file: File): AssetType {
+  const name = file.name.toLowerCase();
+  if (file.type.startsWith("video") || /\.(mp4|mov|avi|webm|mkv)$/i.test(name)) return "video";
+  if (file.type.startsWith("image") || /\.(png|jpe?g|gif|webp|bmp)$/i.test(name)) return "image";
+  if (file.type.startsWith("audio") || /\.(mp3|wav|m4a|ogg|webm|aac)$/i.test(name)) return "audio";
+  if (file.type === "application/json" || name.endsWith(".json")) return "json";
+  return "json";
+}
+
+async function createSession(athleteId: string, sport: string, description: string) {
+  return api<{ id: string }>("/sessions", {
     method: "POST",
     body: JSON.stringify({
       athlete_id: athleteId,
@@ -172,24 +181,63 @@ export async function createSessionAndUpload(
       description: description.trim() || null,
     }),
   });
+}
 
-  const assetType =
-    file.type.startsWith("video") || /\.(mp4|mov|avi|webm|mkv)$/i.test(file.name)
-      ? "video"
-      : "json";
-
+export async function uploadSessionAsset(sessionId: string, file: File, assetType: AssetType) {
   const form = new FormData();
   form.append("asset_type", assetType);
   form.append("file", file, file.name);
 
-  const res = await fetch(`${CLIENT_API_BASE}/sessions/${session.id}/assets`, {
+  const res = await fetch(`${CLIENT_API_BASE}/sessions/${sessionId}/assets`, {
     method: "POST",
     credentials: "include",
     body: form,
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(err || "Upload failed");
+    throw new Error(parseApiError(err, "Upload failed"));
   }
-  return res.json();
+  return res.json() as Promise<{ topic?: string; status: string }>;
+}
+
+export async function createSessionAndUpload(
+  athleteId: string,
+  sport: string,
+  description: string,
+  file: File,
+  assetType?: AssetType
+) {
+  const session = await createSession(athleteId, sport, description);
+  const type = assetType ?? inferAssetType(file);
+  const result = await uploadSessionAsset(session.id, file, type);
+  return { sessionId: session.id, ...result };
+}
+
+export async function createSessionAndUploadMany(
+  athleteId: string,
+  sport: string,
+  description: string,
+  files: File[],
+  assetType: AssetType
+) {
+  const session = await createSession(athleteId, sport, description);
+  const results = [];
+  for (const file of files) {
+    results.push(await uploadSessionAsset(session.id, file, assetType));
+  }
+  return { sessionId: session.id, count: files.length, results };
+}
+
+export async function createSessionAndSubmitNote(
+  athleteId: string,
+  sport: string,
+  description: string,
+  noteText: string
+) {
+  const session = await createSession(athleteId, sport, description);
+  const result = await api<{ message: string; status: string }>(`/sessions/${session.id}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ content: noteText }),
+  });
+  return { sessionId: session.id, ...result };
 }

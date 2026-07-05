@@ -17,6 +17,107 @@
 }
 
 @layer components {
+  .app-shell {
+    @apply relative min-h-screen bg-white lg:h-screen lg:overflow-hidden;
+  }
+
+  .app-shell::before,
+  .app-shell::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: min(320px, 28vw);
+    pointer-events: none;
+    z-index: 0;
+    background-image: radial-gradient(
+      circle,
+      rgba(0, 102, 255, 0.08) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+
+  .app-shell::before {
+    left: 15rem;
+    mask-image: linear-gradient(to right, black 0%, transparent 100%);
+  }
+
+  .app-shell::after {
+    right: 0;
+    mask-image: linear-gradient(to left, black 0%, transparent 100%);
+  }
+
+  .app-sidebar {
+    @apply fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-gray-100 bg-white shadow-sm;
+  }
+
+  @media (max-width: 1023px) {
+    .app-sidebar {
+      @apply inset-x-0 bottom-auto h-14 w-full flex-row items-stretch border-b border-r-0 border-gray-100 shadow-sm;
+    }
+
+    .app-sidebar-header {
+      @apply hidden;
+    }
+
+    .app-sidebar-nav {
+      @apply flex flex-1 flex-row items-center gap-1 overflow-x-auto p-2;
+    }
+
+    .app-sidebar-nav .nav-link {
+      @apply shrink-0 px-3 py-2 text-xs;
+    }
+
+    .app-sidebar-nav .nav-link span {
+      @apply sr-only;
+    }
+
+    .app-sidebar-footer {
+      @apply hidden;
+    }
+
+    .app-main {
+      @apply min-h-screen pt-14 lg:pt-0;
+    }
+  }
+
+  .app-sidebar-header {
+    @apply flex h-16 shrink-0 items-center gap-3 border-b border-gray-100 px-5;
+  }
+
+  .app-sidebar-nav {
+    @apply flex-1 space-y-1 overflow-y-auto p-3;
+  }
+
+  .app-sidebar-footer {
+    @apply shrink-0 space-y-2 border-t border-gray-100 bg-white p-4;
+  }
+
+  .app-main {
+    @apply relative z-10 min-h-screen w-full bg-white p-6 sm:p-8 lg:ml-60 lg:min-h-0 lg:h-screen lg:overflow-y-auto lg:p-10;
+  }
+
+  .app-page {
+    @apply w-full space-y-8;
+  }
+
+  .app-page-xl {
+    @apply app-page max-w-7xl;
+  }
+
+  .app-page-lg {
+    @apply app-page max-w-5xl;
+  }
+
+  .app-page-md {
+    @apply app-page max-w-4xl;
+  }
+
+  .app-page-sm {
+    @apply app-page max-w-3xl;
+  }
+
   .page-shell {
     @apply relative min-h-screen bg-white;
   }
@@ -41,6 +142,19 @@
   .page-shell::before {
     left: 15rem;
     mask-image: linear-gradient(to right, black 0%, transparent 100%);
+  }
+
+  @media (max-width: 1023px) {
+    .page-shell::before,
+    .page-shell::after,
+    .app-shell::before,
+    .app-shell::after {
+      display: none;
+    }
+
+    .app-main {
+      @apply pt-0;
+    }
   }
 
   .page-shell::after {

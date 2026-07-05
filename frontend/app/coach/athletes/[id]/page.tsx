@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
 import { athletesApi, chatApi, downloadReport } from "@/lib/api";
 import { PerformanceCharts } from "@/components/athletes/performance-charts";
+import { TrainingTimeline } from "@/components/athletes/training-timeline";
 
 export default function CoachAthletePage() {
   const params = useParams();
@@ -18,15 +18,23 @@ export default function CoachAthletePage() {
 
   useEffect(() => {
     if (!athleteId) return;
-    athletesApi.get(athleteId).then((a) => {
-      setName(a.name);
-      setSport(a.sport);
-    }).catch(() => setError("Athlete not found"));
-    chatApi.timeline(athleteId).then((d) => setTimeline(d.entries)).catch(() => {});
+    athletesApi
+      .get(athleteId)
+      .then((a) => {
+        setName(a.name);
+        setSport(a.sport);
+      })
+      .catch(() => setError("Athlete not found"));
+    chatApi
+      .timeline(athleteId)
+      .then((d) => setTimeline(d.entries))
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Failed to load timeline")
+      );
   }, [athleteId]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-8 lg:p-10">
+    <div className="app-page-lg">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Link href="/coach/dashboard" className="mb-2 inline-block text-xs text-muted hover:text-black">
@@ -56,21 +64,7 @@ export default function CoachAthletePage() {
       </div>
       <PerformanceCharts entries={timeline} />
       <div className="glass p-6">
-        <h2 className="section-title mb-4">
-          Training Timeline <span className="font-mono text-xs font-normal text-brand">recall()</span>
-        </h2>
-        {timeline.length === 0 ? (
-          <p className="text-sm text-muted">No memories yet — upload a session to populate Cognee.</p>
-        ) : (
-          <div className="space-y-3">
-            {timeline.map((entry, i) => (
-              <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }} className="flex items-start gap-3">
-                <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-brand" />
-                <p className="text-sm leading-6 text-muted">{entry.summary.slice(0, 500)}</p>
-              </motion.div>
-            ))}
-          </div>
-        )}
+        <TrainingTimeline athleteId={athleteId} embedded />
       </div>
     </div>
   );
