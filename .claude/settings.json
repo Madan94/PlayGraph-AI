@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import cognee; import inspect; print\\(inspect.getfile\\(cognee\\)\\)\")",
+      "Bash(python -c \"import cognee; import os; print\\(os.path.dirname\\(cognee.__file__\\)\\)\")",
+      "Bash(ls \"C:\\\\Users\\\\ASUS VIVOBOOK\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python313\\\\Lib\\\\site-packages\\\\cognee\\\\infrastructure\\\\databases\\\\graph\\\\\")",
+      "Read(//c/Users/ASUS VIVOBOOK/AppData/Local/Programs/Python/Python313/Lib/site-packages/cognee/infrastructure/databases/**)",
+      "Read(//c/Users/ASUS VIVOBOOK/AppData/Local/Programs/Python/Python313/Lib/site-packages/cognee/infrastructure/databases/graph/**)",
+      "Read(//c/Users/ASUS VIVOBOOK/AppData/Local/Programs/Python/Python313/Lib/site-packages/cognee/infrastructure/databases/vector/**)",
+      "Bash(python -c ' *)",
+      "Bash(ls \"/c/Users/ASUS VIVOBOOK/.cognee/logs/\" 2>&1 | head)",
+      "Read(//c/Users/ASUS VIVOBOOK/.cognee/logs//**)"
+    ]
+  }
+}

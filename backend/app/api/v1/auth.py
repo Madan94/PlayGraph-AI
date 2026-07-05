@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -263,6 +262,109 @@ async def me(
     db: AsyncSession = Depends(get_db),
 ):
     return await _user_response(db, user.id, user.email, user.role, user.full_name)
+
+
+_DEMO_USERS: dict[str, dict] = {
+    "rahul@nextplay.ai": {"role": "athlete", "full_name": "Rahul Sharma", "sport": "cricket"},
+    "coach@nextplay.ai": {"role": "coach", "full_name": "Marcus Chen", "sport": None},
+}
+_DEMO_ATHLETE_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+
+class LoginBody(BaseModel):
+    email: EmailStr
+    password: str  # ignored — any password works for demo
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    full_name: str | None
+
+
+@router.post("/login", response_model=LoginResponse)
+async def demo_login(body: LoginBody, db: AsyncSession = Depends(get_db)):
+    """Password-less demo login. Creates the demo user + athlete on first call."""
+    email = body.email.lower().strip()
+    demo = _DEMO_USERS.get(email)
+
+    user_row = await db.execute(
+        text("SELECT id, role, full_name FROM users WHERE email = :email"),
+        {"email": email},
+    )
+    user = user_row.first()
+
+    if user is None:
+        role = demo["role"] if demo else "athlete"
+        full_name = (
+            demo["full_name"] if demo
+            else email.split("@")[0].replace(".", " ").title()
+        )
+        user_id = str(uuid.uuid4())
+
+        await db.execute(
+            text("""
+                INSERT INTO users (id, email, role, full_name)
+                VALUES (CAST(:id AS uuid), :email, CAST(:role AS user_role), :full_name)
+            """),
+            {"id": user_id, "email": email, "role": role, "full_name": full_name},
+        )
+
+        if role == "athlete":
+            athlete_id = _DEMO_ATHLETE_ID if email == "rahul@nextplay.ai" else str(uuid.uuid4())
+            sport = (demo or {}).get("sport") or "cricket"
+            await db.execute(
+                text("""
+                    INSERT INTO athletes (id, user_id, name, sport, metadata)
+                    VALUES (CAST(:id AS uuid), CAST(:user_id AS uuid), :name, :sport, '{}'::jsonb)
+                    ON CONFLICT (id) DO NOTHING
+                """),
+                {"id": athlete_id, "user_id": user_id, "name": full_name, "sport": sport},
+            )
+    else:
+        user_id = str(user.id)
+        role = str(user.role)
+        full_name = user.full_name
+        # Ensure the fixed demo athlete ID exists even if user was created earlier
+        if email == "rahul@nextplay.ai":
+            await db.execute(
+                text("""
+                    INSERT INTO athletes (id, user_id, name, sport, metadata)
+                    VALUES (CAST(:id AS uuid), CAST(:user_id AS uuid), :name, :sport, '{}'::jsonb)
+                    ON CONFLICT (id) DO NOTHING
+                """),
+                {
+                    "id": _DEMO_ATHLETE_ID,
+                    "user_id": user_id,
+                    "name": full_name or "Rahul Sharma",
+                    "sport": "cricket",
+                },
+            )
+
+    if email == "coach@nextplay.ai":
+        await db.execute(
+            text("""
+                INSERT INTO coach_athlete (coach_id, athlete_id)
+                VALUES (CAST(:coach_id AS uuid), CAST(:athlete_id AS uuid))
+                ON CONFLICT DO NOTHING
+            """),
+            {"coach_id": user_id, "athlete_id": _DEMO_ATHLETE_ID},
+        )
+
+    jti = generate_jti()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
+    await db.execute(
+        text("""
+            INSERT INTO auth_sessions (user_id, jti, expires_at)
+            VALUES (CAST(:user_id AS uuid), :jti, :expires_at)
+        """),
+        {"user_id": user_id, "jti": jti, "expires_at": expires_at},
+    )
+    await db.commit()
+
+    token = create_access_token(user_id=user_id, email=email, role=role, jti=jti)
+    return LoginResponse(access_token=token, role=role, full_name=full_name)
 
 
 @router.post("/onboarding", response_model=UserResponse)

@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 _ENV_FILE = _REPO_ROOT / ".env"
@@ -43,7 +42,7 @@ class Settings(BaseSettings):
 
     backend_port: int = 8002
     frontend_port: int = 3002
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3002"]
+    cors_origins: list[str] = ["http://localhost:3002"]
     qwen_api_url: str = ""
     qwen_api_key: str = ""
     qwen_model: str = "openai/gpt-4o"
