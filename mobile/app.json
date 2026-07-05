@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "NextPlayAI",
+    "slug": "nextplayai-mobile",
+    "version": "1.0.0",
+    "scheme": "nextplayai",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ai.nextplay.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "NextPlayAI uses your camera to capture training clips and photos for your athlete profile.",
+        "NSMicrophoneUsageDescription": "NextPlayAI uses your microphone to record voice notes and video audio during training sessions.",
+        "NSPhotoLibraryUsageDescription": "NextPlayAI needs access to your photo library to attach existing videos and images to a training session."
+      }
+    },
+    "android": {
+      "package": "ai.nextplay.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#09090B",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "NextPlayAI needs access to your photos to attach media to a training session.",
+          "cameraPermission": "NextPlayAI uses your camera to capture training clips and photos.",
+          "microphonePermission": "NextPlayAI uses your microphone to record audio with video clips."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "NextPlayAI uses your microphone to record voice notes during training sessions."
+        }
+      ],
+      "expo-splash-screen",
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
