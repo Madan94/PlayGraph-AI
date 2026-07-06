@@ -74,7 +74,7 @@ We are building a **React Native mobile application** for efficient athlete asse
 | **Timeline & progress** | View recalled memories on mobile |
 | **Offline-first queue** | Queue uploads when connectivity is poor; sync when online |
 
-![Mobile App Mockup](./docs/images/placeholder-mobile-app.png)
+![Mobile App Mockup](./docs/images/placeholder-mobile-app.jpg)
 
 
 The mobile app shares the same backend API, auth (OTP), and Cognee memory graph as the web app — one athlete, one memory dataset, multiple surfaces.
@@ -593,8 +593,6 @@ sequenceDiagram
   NextBFF-->>User: Set httpOnly cookie + user JSON
 ```
 
-![Auth Flow](./docs/images/placeholder-auth-flow.png)
-
 ### Roles
 
 | Role | Access |
@@ -634,7 +632,6 @@ sequenceDiagram
 | `/athlete/timeline` | Recalled training memories |
 | `/athlete/settings` | Coach invite redemption |
 
-![Athlete Portal](./docs/images/placeholder-athlete-portal.png)
 
 ---
 
@@ -884,6 +881,3 @@ For questions about Cognee integration, see [`docs/architecture.md`](docs/archit
   <strong>PlayGraphAI</strong> — Memory-first athlete intelligence powered by Cognee
 </p>
 
-<p align="center">
-  <img src="./docs/images/placeholder-logo-banner.png" alt="PlayGraphAI Logo Banner" width="600" />
-</p>
