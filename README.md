@@ -5,7 +5,7 @@
 > Empowering young athletes through technology, structured assessment, and persistent coaching memory.
 
 ![PlayGraphAI Platform Overview](./docs/images/placeholder-platform-overview.png)
-*Replace with a hero screenshot: landing page or coach dashboard*
+
 
 ---
 
@@ -60,7 +60,7 @@ Traditional sports tech stores files in drives and spreadsheets. Coaches lose co
 | **Athlete portal** | Athletes | Dashboard, upload, timeline, settings, coach linking via invite |
 
 ![Coach Dashboard](./docs/images/placeholder-coach-dashboard.png)
-*Replace with screenshot: coach dashboard with athletes + live memory stream*
+
 
 ### Mobile App (In Development)
 
@@ -75,7 +75,7 @@ We are building a **React Native mobile application** for efficient athlete asse
 | **Offline-first queue** | Queue uploads when connectivity is poor; sync when online |
 
 ![Mobile App Mockup](./docs/images/placeholder-mobile-app.png)
-*Replace with screenshot or mockup: React Native capture + upload flow*
+
 
 The mobile app shares the same backend API, auth (OTP), and Cognee memory graph as the web app — one athlete, one memory dataset, multiple surfaces.
 
@@ -97,7 +97,6 @@ PlayGraphAI is intentionally built **memory-first**, not chat-first. [Cognee](ht
 | **Per-athlete isolation** | Dataset pattern: `{COGNEE_DATASET}_{athlete_id}` |
 
 ![Cognee Memory Graph](./docs/images/placeholder-cognee-graph.png)
-*Replace with screenshot: Cognee Cloud UI or knowledge graph visualization*
 
 ### Cognee Cloud vs Embedded
 
@@ -208,7 +207,7 @@ flowchart TB
 ```
 
 ![Architecture Diagram](./docs/images/placeholder-architecture.png)
-*Replace with exported architecture diagram if preferred over Mermaid*
+
 
 ### Layer Responsibilities
 
@@ -241,7 +240,6 @@ Coach/Athlete uploads file
 ```
 
 ![Upload Flow](./docs/images/placeholder-upload-flow.png)
-*Replace with screenshot: upload UI → success → worker logs → memory stream*
 
 ### 2. Manual Notes (No Worker)
 
@@ -263,7 +261,6 @@ Coach asks question + selects athlete
 ```
 
 ![Coach Chat](./docs/images/placeholder-coach-chat.png)
-*Replace with screenshot: coach chat with recall citations*
 
 ### 4. Training Timeline
 
@@ -425,7 +422,6 @@ docker compose -f docker-compose.workers.yml up -d postgres minio redpanda
 ```
 
 ![Infrastructure](./docs/images/placeholder-docker-infra.png)
-*Replace with screenshot: `docker compose ps` showing healthy services*
 
 Verify:
 
@@ -560,7 +556,6 @@ Header: X-Internal-Key: {AUTH_INTERNAL_SERVICE_KEY}
 ```
 
 ![Worker Pipeline](./docs/images/placeholder-worker-pipeline.png)
-*Replace with screenshot: workflow canvas or worker logs*
 
 ### Start workers locally (alternative)
 
@@ -599,7 +594,6 @@ sequenceDiagram
 ```
 
 ![Auth Flow](./docs/images/placeholder-auth-flow.png)
-*Replace with screenshot: OTP login screens*
 
 ### Roles
 
@@ -641,7 +635,6 @@ sequenceDiagram
 | `/athlete/settings` | Coach invite redemption |
 
 ![Athlete Portal](./docs/images/placeholder-athlete-portal.png)
-*Replace with screenshot: athlete dashboard*
 
 ---
 
@@ -894,5 +887,3 @@ For questions about Cognee integration, see [`docs/architecture.md`](docs/archit
 <p align="center">
   <img src="./docs/images/placeholder-logo-banner.png" alt="PlayGraphAI Logo Banner" width="600" />
 </p>
-
-*Replace `docs/images/placeholder-*.png` with real screenshots before publishing.*
